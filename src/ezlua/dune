@@ -1,0 +1,4 @@
+(library
+ (name ezlua)
+ (public_name ezlua)
+ (libraries ocaml-lua))
