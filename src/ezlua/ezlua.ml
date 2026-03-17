@@ -177,26 +177,17 @@ let get_global codec state name =
   Lua.pop state 1;
   result
 
+let pop_error state =
+  let msg =
+    match Lua.tostring state (-1) with
+    | Some s -> s
+    | None -> "unknown Lua error"
+  in
+  Lua.pop state 1;
+  Error msg
+
 let run state code =
-  if LuaL.dostring state code then Ok ()
-  else begin
-    let msg =
-      match Lua.tostring state (-1) with
-      | Some s -> s
-      | None -> "unknown Lua error"
-    in
-    Lua.pop state 1;
-    Error msg
-  end
+  if LuaL.dostring state code then Ok () else pop_error state
 
 let run_file state path =
-  if LuaL.dofile state path then Ok ()
-  else begin
-    let msg =
-      match Lua.tostring state (-1) with
-      | Some s -> s
-      | None -> "unknown Lua error"
-    in
-    Lua.pop state 1;
-    Error msg
-  end
+  if LuaL.dofile state path then Ok () else pop_error state
