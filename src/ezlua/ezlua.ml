@@ -54,14 +54,23 @@ let option (c : 'a codec) : 'a option codec = {
     (fun state v ->
       match v with
       | None -> Lua.pushnil state
-      | Some x -> c.to_lua state x);
+      | Some x ->
+        Lua.newtable state;
+        c.to_lua state x;
+        Lua.rawseti state (-2) 1);
   of_lua =
     (fun state idx ->
       if Lua.isnoneornil state idx then Ok None
-      else
-        match c.of_lua state idx with
+      else if not (Lua.istable state idx) then
+        Error (Printf.sprintf "expected nil or table for option, got %s" (LuaL.typename state idx))
+      else begin
+        Lua.rawgeti state idx 1;
+        let result = c.of_lua state (-1) in
+        Lua.pop state 1;
+        match result with
         | Ok x -> Ok (Some x)
-        | Error e -> Error e);
+        | Error e -> Error e
+      end);
 }
 
 let list (c : 'a codec) : 'a list codec = {
