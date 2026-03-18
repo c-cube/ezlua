@@ -1,13 +1,46 @@
 open Lua_api
 
-type person = { name: string; age: int; active: bool } [@@deriving ezlua]
-type color = Red | Green | Blue [@@deriving ezlua]
-type shape = Circle of float | Rect of float * float | Point [@@deriving ezlua]
-type 'a wrapped = { value: 'a; label: string } [@@deriving ezlua]
-type score = { player: string; points: int list } [@@deriving ezlua]
+type person = {
+  name: string;
+  age: int;
+  active: bool;
+}
+[@@deriving ezlua]
+
+type color =
+  | Red
+  | Green
+  | Blue
+[@@deriving ezlua]
+
+type shape =
+  | Circle of float
+  | Rect of float * float
+  | Point
+[@@deriving ezlua]
+
+type 'a wrapped = {
+  value: 'a;
+  label: string;
+}
+[@@deriving ezlua]
+
+type score = {
+  player: string;
+  points: int list;
+}
+[@@deriving ezlua]
+
 type opt_test = { maybe: string option } [@@deriving ezlua]
 
-let () = ignore (codec_person, codec_color, codec_shape, codec_wrapped, codec_score, codec_opt_test)
+let () =
+  ignore
+    ( codec_person,
+      codec_color,
+      codec_shape,
+      codec_wrapped,
+      codec_score,
+      codec_opt_test )
 
 (* ------------------------------------------------------------------ *)
 
@@ -21,7 +54,9 @@ let test_person_roundtrip () =
   let state = Ezlua.create () in
   let p = { name = "Alice"; age = 30; active = true } in
   Ezlua.set_global codec_person state "p" p;
-  let p2 = check_ok "person roundtrip" (Ezlua.get_global codec_person state "p") in
+  let p2 =
+    check_ok "person roundtrip" (Ezlua.get_global codec_person state "p")
+  in
   Alcotest.(check string) "name" p.name p2.name;
   Alcotest.(check int) "age" p.age p2.age;
   Alcotest.(check bool) "active" p.active p2.active
@@ -30,7 +65,9 @@ let test_person_from_lua () =
   let state = Ezlua.create () in
   let ok = LuaL.dostring state {|p = {name="Bob", age=25, active=false}|} in
   if not ok then Alcotest.fail "lua error";
-  let p = check_ok "person from lua" (Ezlua.get_global codec_person state "p") in
+  let p =
+    check_ok "person from lua" (Ezlua.get_global codec_person state "p")
+  in
   Alcotest.(check string) "name" "Bob" p.name;
   Alcotest.(check int) "age" 25 p.age;
   Alcotest.(check bool) "active" false p.active
@@ -41,7 +78,9 @@ let test_color_roundtrip () =
   List.iter
     (fun c ->
       Ezlua.set_global codec_color state "c" c;
-      let c2 = check_ok "color roundtrip" (Ezlua.get_global codec_color state "c") in
+      let c2 =
+        check_ok "color roundtrip" (Ezlua.get_global codec_color state "c")
+      in
       match c, c2 with
       | Red, Red | Green, Green | Blue, Blue -> ()
       | _ -> Alcotest.fail "color mismatch")
@@ -53,7 +92,9 @@ let test_shape_roundtrip () =
   List.iter
     (fun s ->
       Ezlua.set_global codec_shape state "s" s;
-      let s2 = check_ok "shape roundtrip" (Ezlua.get_global codec_shape state "s") in
+      let s2 =
+        check_ok "shape roundtrip" (Ezlua.get_global codec_shape state "s")
+      in
       match s, s2 with
       | Circle r, Circle r2 -> Alcotest.(check (float 1e-9)) "circle r" r r2
       | Rect (w, h), Rect (w2, h2) ->
@@ -76,7 +117,10 @@ let test_wrapped_roundtrip () =
   let state = Ezlua.create () in
   let w = { value = 42; label = "answer" } in
   Ezlua.set_global (codec_wrapped Ezlua.int) state "w" w;
-  let w2 = check_ok "wrapped roundtrip" (Ezlua.get_global (codec_wrapped Ezlua.int) state "w") in
+  let w2 =
+    check_ok "wrapped roundtrip"
+      (Ezlua.get_global (codec_wrapped Ezlua.int) state "w")
+  in
   Alcotest.(check int) "value" w.value w2.value;
   Alcotest.(check string) "label" w.label w2.label
 
@@ -84,7 +128,9 @@ let test_score_roundtrip () =
   let state = Ezlua.create () in
   let s = { player = "player1"; points = [ 10; 20; 30 ] } in
   Ezlua.set_global codec_score state "s" s;
-  let s2 = check_ok "score roundtrip" (Ezlua.get_global codec_score state "s") in
+  let s2 =
+    check_ok "score roundtrip" (Ezlua.get_global codec_score state "s")
+  in
   Alcotest.(check string) "player" s.player s2.player;
   Alcotest.(check (list int)) "points" s.points s2.points
 
@@ -103,14 +149,13 @@ let test_nested_option () =
   let codec = Ezlua.(option (option string)) in
   let state = Ezlua.create () in
   let cases =
-    [ (None,           "None");
-      (Some None,      "Some None");
-      (Some (Some "x"), "Some (Some x)") ]
+    [ None, "None"; Some None, "Some None"; Some (Some "x"), "Some (Some x)" ]
   in
-  List.iter (fun (v, label) ->
-    Ezlua.set_global codec state "v" v;
-    let v2 = check_ok label (Ezlua.get_global codec state "v") in
-    Alcotest.(check (option (option string))) label v v2)
+  List.iter
+    (fun (v, label) ->
+      Ezlua.set_global codec state "v" v;
+      let v2 = check_ok label (Ezlua.get_global codec state "v") in
+      Alcotest.(check (option (option string))) label v v2)
     cases
 
 let%lua add (x : int) (y : int) : int = x + y
@@ -152,22 +197,19 @@ let () =
           test_case "roundtrip" `Quick test_person_roundtrip;
           test_case "from_lua" `Quick test_person_from_lua;
         ] );
-      ( "color",
-        [ test_case "roundtrip" `Quick test_color_roundtrip ] );
+      "color", [ test_case "roundtrip" `Quick test_color_roundtrip ];
       ( "shape",
         [
           test_case "roundtrip" `Quick test_shape_roundtrip;
           test_case "from_lua" `Quick test_shape_from_lua;
         ] );
-      ( "wrapped",
-        [ test_case "roundtrip" `Quick test_wrapped_roundtrip ] );
-      ( "score",
-        [ test_case "roundtrip" `Quick test_score_roundtrip ] );
+      "wrapped", [ test_case "roundtrip" `Quick test_wrapped_roundtrip ];
+      "score", [ test_case "roundtrip" `Quick test_score_roundtrip ];
       ( "option",
-        [ test_case "roundtrip" `Quick test_opt_roundtrip;
-          test_case "nested" `Quick test_nested_option ] );
-      ( "let_lua",
-        [ test_case "callback" `Quick test_let_lua ] );
-      ( "ezlua_smoke",
-        [ test_case "smoke" `Quick test_ezlua_smoke ] );
+        [
+          test_case "roundtrip" `Quick test_opt_roundtrip;
+          test_case "nested" `Quick test_nested_option;
+        ] );
+      "let_lua", [ test_case "callback" `Quick test_let_lua ];
+      "ezlua_smoke", [ test_case "smoke" `Quick test_ezlua_smoke ];
     ]

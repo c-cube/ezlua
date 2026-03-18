@@ -1,4 +1,5 @@
 (test
  (name test_deriving)
  (libraries ezlua alcotest)
- (preprocess (pps ppx_ezlua)))
+ (preprocess
+  (pps ppx_ezlua)))

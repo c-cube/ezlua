@@ -8,34 +8,27 @@ open Ast_builder.Default
 (* Build an expression that refers to the Ezlua codec for a core_type *)
 let rec codec_expr_of_type ~loc (ct : core_type) : expression =
   match ct.ptyp_desc with
-  | Ptyp_constr ({ txt = Lident "int"; _ }, []) ->
-    [%expr Ezlua.int]
-  | Ptyp_constr ({ txt = Lident "float"; _ }, []) ->
-    [%expr Ezlua.float]
-  | Ptyp_constr ({ txt = Lident "string"; _ }, []) ->
-    [%expr Ezlua.string]
-  | Ptyp_constr ({ txt = Lident "bool"; _ }, []) ->
-    [%expr Ezlua.bool]
-  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) ->
-    [%expr Ezlua.unit_]
-  | Ptyp_constr ({ txt = Lident "list"; _ }, [arg]) ->
+  | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr Ezlua.int]
+  | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr Ezlua.float]
+  | Ptyp_constr ({ txt = Lident "string"; _ }, []) -> [%expr Ezlua.string]
+  | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr Ezlua.bool]
+  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.unit_]
+  | Ptyp_constr ({ txt = Lident "list"; _ }, [ arg ]) ->
     let inner = codec_expr_of_type ~loc arg in
     [%expr Ezlua.list [%e inner]]
-  | Ptyp_constr ({ txt = Lident "array"; _ }, [arg]) ->
+  | Ptyp_constr ({ txt = Lident "array"; _ }, [ arg ]) ->
     let inner = codec_expr_of_type ~loc arg in
     [%expr Ezlua.array [%e inner]]
-  | Ptyp_constr ({ txt = Lident "option"; _ }, [arg]) ->
+  | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
     let inner = codec_expr_of_type ~loc arg in
     [%expr Ezlua.option [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     (* user-defined type: use codec_<name>, passing codec args for params *)
-    let base =
-      pexp_ident ~loc { loc; txt = Lident ("codec_" ^ name) }
-    in
+    let base = pexp_ident ~loc { loc; txt = Lident ("codec_" ^ name) } in
     List.fold_left
       (fun acc arg ->
         let c = codec_expr_of_type ~loc arg in
-        pexp_apply ~loc acc [ (Nolabel, c) ])
+        pexp_apply ~loc acc [ Nolabel, c ])
       base args
   | Ptyp_var name ->
     (* type variable 'a -> passed as argument codec_a *)
@@ -47,9 +40,9 @@ let rec codec_expr_of_type ~loc (ct : core_type) : expression =
       let cb = codec_expr_of_type ~loc b in
       [%expr Ezlua.pair [%e ca] [%e cb]]
     | _ ->
-      Location.raise_errorf ~loc "ppx_ezlua: tuples with arity != 2 not supported")
-  | _ ->
-    Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
+      Location.raise_errorf ~loc
+        "ppx_ezlua: tuples with arity != 2 not supported")
+  | _ -> Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
 
 (* to_lua function for a core_type, given expression e *)
 let to_lua_fn_of_type ~loc (ct : core_type) : expression =
@@ -84,20 +77,27 @@ let wrap_with_params ~loc param_names body =
    For polymorphic types the generated names are applied to their codec args. *)
 let build_codec_stri ~loc ~to_lua_name ~of_lua_name ~codec_name ~param_names =
   let args_fwd =
-    List.map (fun pname -> pexp_ident ~loc { loc; txt = Lident ("codec_" ^ pname) }) param_names
+    List.map
+      (fun pname -> pexp_ident ~loc { loc; txt = Lident ("codec_" ^ pname) })
+      param_names
   in
   let apply_args base =
-    List.fold_left (fun acc a -> pexp_apply ~loc acc [ (Nolabel, a) ]) base args_fwd
+    List.fold_left
+      (fun acc a -> pexp_apply ~loc acc [ Nolabel, a ])
+      base args_fwd
   in
   let body =
     [%expr
       {
         Ezlua.to_lua =
           [%e apply_args (pexp_ident ~loc { loc; txt = Lident to_lua_name })];
-        of_lua = [%e apply_args (pexp_ident ~loc { loc; txt = Lident of_lua_name })];
+        of_lua =
+          [%e apply_args (pexp_ident ~loc { loc; txt = Lident of_lua_name })];
       }]
   in
-  [%stri let [%p ppat_var ~loc { loc; txt = codec_name }] = [%e wrap_with_params ~loc param_names body]]
+  [%stri
+    let [%p ppat_var ~loc { loc; txt = codec_name }] =
+      [%e wrap_with_params ~loc param_names body]]
 
 (* ------------------------------------------------------------------ *)
 (* Record deriver *)
@@ -114,13 +114,16 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
           let ftype = ld.pld_type in
           let to_fn = to_lua_fn_of_type ~loc ftype in
           let fexpr = pexp_field ~loc [%expr v] { loc; txt = Lident fname } in
-          [%expr Ezlua.push_field state [%e estring ~loc fname] [%e to_fn] [%e fexpr]])
+          [%expr
+            Ezlua.push_field state [%e estring ~loc fname] [%e to_fn] [%e fexpr]])
         fields
     in
     List.fold_right
-      (fun push_expr acc -> [%expr [%e push_expr]; [%e acc]])
-      field_pushes
-      [%expr ()]
+      (fun push_expr acc ->
+        [%expr
+          [%e push_expr];
+          [%e acc]])
+      field_pushes [%expr ()]
   in
   let to_lua_fn_body =
     [%expr
@@ -134,7 +137,8 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
       List.map
         (fun ld ->
           let fname = ld.pld_name.txt in
-          ({ loc; txt = Lident fname }, pexp_ident ~loc { loc; txt = Lident fname }))
+          ( { loc; txt = Lident fname },
+            pexp_ident ~loc { loc; txt = Lident fname } ))
         fields
     in
     pexp_record ~loc record_fields None
@@ -146,7 +150,9 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
         let ftype = ld.pld_type in
         let codec = codec_expr_of_type ~loc ftype in
         [%expr
-          match Ezlua.get_field state idx [%e estring ~loc fname] [%e codec] with
+          match
+            Ezlua.get_field state idx [%e estring ~loc fname] [%e codec]
+          with
           | Error e -> Error e
           | Ok [%p ppat_var ~loc { loc; txt = fname }] -> [%e inner]])
       fields
@@ -160,14 +166,19 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
             (Printf.sprintf "expected table for %s, got %s"
                [%e estring ~loc type_name]
                (Lua_api.LuaL.typename state idx))
-        else [%e of_lua_body]]
+        else
+          [%e of_lua_body]]
   in
   let to_lua_name = "to_lua_" ^ type_name in
   let of_lua_name = "of_lua_" ^ type_name in
   let codec_name = "codec_" ^ type_name in
   [
-    [%stri let [%p ppat_var ~loc { loc; txt = to_lua_name }] = [%e wrap_with_params ~loc param_names to_lua_fn_body]];
-    [%stri let [%p ppat_var ~loc { loc; txt = of_lua_name }] = [%e wrap_with_params ~loc param_names of_lua_fn_body]];
+    [%stri
+      let [%p ppat_var ~loc { loc; txt = to_lua_name }] =
+        [%e wrap_with_params ~loc param_names to_lua_fn_body]];
+    [%stri
+      let [%p ppat_var ~loc { loc; txt = of_lua_name }] =
+        [%e wrap_with_params ~loc param_names of_lua_fn_body]];
     build_codec_stri ~loc ~to_lua_name ~of_lua_name ~codec_name ~param_names;
   ]
 
@@ -175,7 +186,8 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
 (* Variant deriver *)
 (* ------------------------------------------------------------------ *)
 
-let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration list) =
+let derive_variant ~loc ~type_name ~params
+    (constrs : constructor_declaration list) =
   let param_names = extract_param_names params in
   (* to_lua match arms *)
   let to_lua_cases =
@@ -189,7 +201,8 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
           let body =
             [%expr
               Lua_api.Lua.newtable state;
-              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua [%e estring ~loc cname]]
+              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua
+                [%e estring ~loc cname]]
           in
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_tuple [ single ] ->
@@ -203,7 +216,8 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
           let body =
             [%expr
               Lua_api.Lua.newtable state;
-              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua [%e estring ~loc cname];
+              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua
+                [%e estring ~loc cname];
               Ezlua.push_field state "value" [%e to_fn] v0]
           in
           case ~lhs:pat ~guard:None ~rhs:body
@@ -216,7 +230,9 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
               { loc; txt = Lident cname }
               (Some
                  (ppat_tuple ~loc
-                    (List.map (fun vn -> ppat_var ~loc { loc; txt = vn }) varnames)))
+                    (List.map
+                       (fun vn -> ppat_var ~loc { loc; txt = vn })
+                       varnames)))
           in
           let push_elems =
             List.mapi
@@ -230,21 +246,25 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
           in
           let push_tuple =
             List.fold_right
-              (fun e acc -> [%expr [%e e]; [%e acc]])
-              push_elems
-              [%expr ()]
+              (fun e acc ->
+                [%expr
+                  [%e e];
+                  [%e acc]])
+              push_elems [%expr ()]
           in
           let body =
             [%expr
               Lua_api.Lua.newtable state;
-              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua [%e estring ~loc cname];
+              Ezlua.push_field state "tag" Ezlua.string.Ezlua.to_lua
+                [%e estring ~loc cname];
               Lua_api.Lua.newtable state;
               [%e push_tuple];
               Lua_api.Lua.setfield state (-2) "value"]
           in
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_record _ ->
-          Location.raise_errorf ~loc "ppx_ezlua: inline record variants not supported")
+          Location.raise_errorf ~loc
+            "ppx_ezlua: inline record variants not supported")
       constrs
   in
   let to_lua_fn_body =
@@ -259,8 +279,8 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
         | Pcstr_tuple [] ->
           let pat = ppat_constant ~loc (Pconst_string (cname, loc, None)) in
           let body =
-            pexp_construct ~loc { loc; txt = Lident cname } None
-            |> fun e -> [%expr Ok [%e e]]
+            pexp_construct ~loc { loc; txt = Lident cname } None |> fun e ->
+            [%expr Ok [%e e]]
           in
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_tuple [ single ] ->
@@ -287,10 +307,12 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
               (fun (i, (ct, vn)) inner ->
                 let codec = codec_expr_of_type ~loc ct in
                 [%expr
-                  match Ezlua.get_index state arr_idx__ [%e eint ~loc i] [%e codec] with
+                  match
+                    Ezlua.get_index state arr_idx__ [%e eint ~loc i] [%e codec]
+                  with
                   | Error e -> Error e
                   | Ok [%p ppat_var ~loc { loc; txt = vn }] -> [%e inner]])
-              (List.mapi (fun i x -> (i + 1, x)) (List.combine multi varnames))
+              (List.mapi (fun i x -> i + 1, x) (List.combine multi varnames))
               [%expr
                 Ok
                   [%e
@@ -299,7 +321,8 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
                       (Some
                          (pexp_tuple ~loc
                             (List.map
-                               (fun vn -> pexp_ident ~loc { loc; txt = Lident vn })
+                               (fun vn ->
+                                 pexp_ident ~loc { loc; txt = Lident vn })
                                varnames)))]]
           in
           let body =
@@ -312,7 +335,8 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
           in
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_record _ ->
-          Location.raise_errorf ~loc "ppx_ezlua: inline record variants not supported")
+          Location.raise_errorf ~loc
+            "ppx_ezlua: inline record variants not supported")
       constrs
   in
   let wildcard_case =
@@ -330,17 +354,22 @@ let derive_variant ~loc ~type_name ~params (constrs : constructor_declaration li
             (Printf.sprintf "expected table for %s, got %s"
                [%e estring ~loc type_name]
                (Lua_api.LuaL.typename state idx))
-        else
+        else (
           match Ezlua.get_field state idx "tag" Ezlua.string with
           | Error e -> Error ("missing tag: " ^ e)
-          | Ok tag__ -> [%e pexp_match ~loc [%expr tag__] all_of_cases]]
+          | Ok tag__ -> [%e pexp_match ~loc [%expr tag__] all_of_cases]
+        )]
   in
   let to_lua_name = "to_lua_" ^ type_name in
   let of_lua_name = "of_lua_" ^ type_name in
   let codec_name = "codec_" ^ type_name in
   [
-    [%stri let [%p ppat_var ~loc { loc; txt = to_lua_name }] = [%e wrap_with_params ~loc param_names to_lua_fn_body]];
-    [%stri let [%p ppat_var ~loc { loc; txt = of_lua_name }] = [%e wrap_with_params ~loc param_names of_lua_fn_body]];
+    [%stri
+      let [%p ppat_var ~loc { loc; txt = to_lua_name }] =
+        [%e wrap_with_params ~loc param_names to_lua_fn_body]];
+    [%stri
+      let [%p ppat_var ~loc { loc; txt = of_lua_name }] =
+        [%e wrap_with_params ~loc param_names of_lua_fn_body]];
     build_codec_stri ~loc ~to_lua_name ~of_lua_name ~codec_name ~param_names;
   ]
 
@@ -357,10 +386,12 @@ let derive_alias ~loc ~type_name ~params (manifest : core_type) =
   [
     [%stri
       let [%p ppat_var ~loc { loc; txt = to_lua_name }] =
-        [%e wrap_with_params ~loc param_names [%expr [%e delegate].Ezlua.to_lua]]];
+        [%e
+          wrap_with_params ~loc param_names [%expr [%e delegate].Ezlua.to_lua]]];
     [%stri
       let [%p ppat_var ~loc { loc; txt = of_lua_name }] =
-        [%e wrap_with_params ~loc param_names [%expr [%e delegate].Ezlua.of_lua]]];
+        [%e
+          wrap_with_params ~loc param_names [%expr [%e delegate].Ezlua.of_lua]]];
     [%stri
       let [%p ppat_var ~loc { loc; txt = codec_name }] =
         [%e wrap_with_params ~loc param_names delegate]];
@@ -382,8 +413,8 @@ let generate_impl ~loc ~path:_ (_rec_flag, type_decls) =
         (match td.ptype_manifest with
         | Some manifest -> derive_alias ~loc ~type_name ~params manifest
         | None ->
-          Location.raise_errorf ~loc "ppx_ezlua: abstract type without manifest: %s"
-            type_name)
+          Location.raise_errorf ~loc
+            "ppx_ezlua: abstract type without manifest: %s" type_name)
       | Ptype_open ->
         Location.raise_errorf ~loc "ppx_ezlua: open types not supported")
     type_decls
@@ -409,11 +440,14 @@ let extract_one_param fp =
       let pname =
         match inner_pat.ppat_desc with
         | Ppat_var { txt; _ } -> txt
-        | _ -> Location.raise_errorf ~loc "let%%lua: expected simple variable pattern"
+        | _ ->
+          Location.raise_errorf ~loc
+            "let%%lua: expected simple variable pattern"
       in
-      (pname, ct)
+      pname, ct
     | _ ->
-      Location.raise_errorf ~loc "let%%lua: all arguments must have type annotations")
+      Location.raise_errorf ~loc
+        "let%%lua: all arguments must have type annotations")
   | _ -> Location.raise_errorf ~loc "let%%lua: unexpected parameter kind"
 
 (* Extract (name, type) list and (body, ret_type) from a fun expression.
@@ -429,7 +463,8 @@ let extract_params expr =
       | Some (Pcoerce _) ->
         Location.raise_errorf ~loc "let%%lua: coerce constraint not supported"
       | None ->
-        Location.raise_errorf ~loc "let%%lua: return type annotation required (e.g., : int)"
+        Location.raise_errorf ~loc
+          "let%%lua: return type annotation required (e.g., : int)"
     in
     let body_expr =
       match body with
@@ -437,12 +472,13 @@ let extract_params expr =
       | Pfunction_cases _ ->
         Location.raise_errorf ~loc "let%%lua: function cases body not supported"
     in
-    (named_params, (body_expr, ret_ct))
+    named_params, (body_expr, ret_ct)
   | Pexp_constraint (inner, ret_ct) ->
     (* no params, just a typed body *)
-    ([], (inner, ret_ct))
+    [], (inner, ret_ct)
   | _ ->
-    Location.raise_errorf ~loc "let%%lua: expected fun expression with type annotations"
+    Location.raise_errorf ~loc
+      "let%%lua: expected fun expression with type annotations"
 
 let expand_lua_let ~loc ~path:_ pat expr =
   let fn_name =
@@ -463,14 +499,22 @@ let expand_lua_let ~loc ~path:_ pat expr =
   (* Build the Lua wrapper *)
   let result_bind =
     [%expr
-      let result__ = [%e pexp_apply ~loc (pexp_ident ~loc { loc; txt = Lident fn_name })
-        (List.map (fun (pname, _) ->
-          (Nolabel, pexp_ident ~loc { loc; txt = Lident pname })) params)] in
+      let result__ =
+        [%e
+          pexp_apply ~loc
+            (pexp_ident ~loc { loc; txt = Lident fn_name })
+            (List.map
+               (fun (pname, _) ->
+                 Nolabel, pexp_ident ~loc { loc; txt = Lident pname })
+               params)]
+      in
       [%e
         let ret_codec = codec_expr_of_type ~loc ret_type in
         match ret_type.ptyp_desc with
         | Ptyp_constr ({ txt = Lident "unit"; _ }, []) ->
-          [%expr ignore result__; 0]
+          [%expr
+            ignore result__;
+            0]
         | _ ->
           [%expr
             [%e ret_codec].Ezlua.to_lua lua_state result__;
@@ -486,11 +530,10 @@ let expand_lua_let ~loc ~path:_ pat expr =
             LuaL.error lua_state "%s"
               [%e
                 estring ~loc (Printf.sprintf "bad arg %d (%s): " i pname)
-                |> fun prefix ->
-                [%expr [%e prefix] ^ msg]];
+                |> fun prefix -> [%expr [%e prefix] ^ msg]];
             0
           | Ok [%p ppat_var ~loc { loc; txt = pname }] -> [%e inner]])
-      (List.mapi (fun i x -> (i + 1, x)) params)
+      (List.mapi (fun i x -> i + 1, x) params)
       result_bind
   in
   let wrapper_fn = [%expr fun lua_state -> [%e wrapper_body]] in
@@ -498,18 +541,19 @@ let expand_lua_let ~loc ~path:_ pat expr =
   [
     [%stri let [%p ppat_var ~loc { loc; txt = fn_name }] = [%e orig_fn]];
     [%stri
-      let [%p ppat_var ~loc { loc; txt = wrapper_name }]
-          : Lua_api_lib.oCamlFunction =
+      let [%p ppat_var ~loc { loc; txt = wrapper_name }] :
+          Lua_api_lib.oCamlFunction =
         [%e wrapper_fn]];
   ]
 
 let lua_ext =
   Extension.declare_inline "lua" Extension.Context.structure_item
-    Ast_pattern.(pstr (pstr_value nonrecursive (value_binding ~pat:__ ~expr:__ ~constraint_:drop ^:: nil) ^:: nil))
+    Ast_pattern.(
+      pstr
+        (pstr_value nonrecursive
+           (value_binding ~pat:__ ~expr:__ ~constraint_:drop ^:: nil)
+        ^:: nil))
     expand_lua_let
 
-let () =
-  Driver.register_transformation "lua"
-    ~extensions:[ lua_ext ]
-
+let () = Driver.register_transformation "lua" ~extensions:[ lua_ext ]
 let _ = ezlua_deriver
