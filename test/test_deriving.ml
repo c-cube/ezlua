@@ -99,6 +99,20 @@ let test_opt_roundtrip () =
   let t4 = check_ok "opt none" (Ezlua.get_global codec_opt_test state "t") in
   Alcotest.(check (option string)) "none" None t4.maybe
 
+let test_nested_option () =
+  let codec = Ezlua.(option (option string)) in
+  let state = Ezlua.create () in
+  let cases =
+    [ (None,           "None");
+      (Some None,      "Some None");
+      (Some (Some "x"), "Some (Some x)") ]
+  in
+  List.iter (fun (v, label) ->
+    Ezlua.set_global codec state "v" v;
+    let v2 = check_ok label (Ezlua.get_global codec state "v") in
+    Alcotest.(check (option (option string))) label v v2)
+    cases
+
 let%lua add (x : int) (y : int) : int = x + y
 let%lua greet (name : string) : string = "Hello, " ^ name
 
@@ -150,7 +164,8 @@ let () =
       ( "score",
         [ test_case "roundtrip" `Quick test_score_roundtrip ] );
       ( "option",
-        [ test_case "roundtrip" `Quick test_opt_roundtrip ] );
+        [ test_case "roundtrip" `Quick test_opt_roundtrip;
+          test_case "nested" `Quick test_nested_option ] );
       ( "let_lua",
         [ test_case "callback" `Quick test_let_lua ] );
       ( "ezlua_smoke",
