@@ -1,29 +1,37 @@
 type state = Lua_api_lib.state
+type 'a to_lua = state -> 'a -> unit
+type 'a of_lua = state -> int -> ('a, string) result
 
-type 'a codec = {
-  to_lua: state -> 'a -> unit;
-  of_lua: state -> int -> ('a, string) result;
-}
+module Encode : sig
+  val int : int to_lua
+  val float : float to_lua
+  val string : string to_lua
+  val bool : bool to_lua
+  val unit_ : unit to_lua
+  val option : 'a to_lua -> 'a option to_lua
+  val list : 'a to_lua -> 'a list to_lua
+  val array : 'a to_lua -> 'a array to_lua
+  val pair : 'a to_lua -> 'b to_lua -> ('a * 'b) to_lua
+end
 
-val int : int codec
-val float : float codec
-val string : string codec
-val bool : bool codec
-val unit_ : unit codec
+module Decode : sig
+  val int : int of_lua
+  val float : float of_lua
+  val string : string of_lua
+  val bool : bool of_lua
+  val unit_ : unit of_lua
+  val option : 'a of_lua -> 'a option of_lua
+  val list : 'a of_lua -> 'a list of_lua
+  val array : 'a of_lua -> 'a array of_lua
+  val pair : 'a of_lua -> 'b of_lua -> ('a * 'b) of_lua
+end
 
-val option : 'a codec -> 'a option codec
-(** [None] encodes as nil; [Some x] encodes as [{x}] (1-element array). This
-    makes [Some None] distinguishable from [None]. *)
-
-val list : 'a codec -> 'a list codec
-val array : 'a codec -> 'a array codec
-val pair : 'a codec -> 'b codec -> ('a * 'b) codec
-val push_field : state -> string -> (state -> 'a -> unit) -> 'a -> unit
-val get_field : state -> int -> string -> 'a codec -> ('a, string) result
-val get_index : state -> int -> int -> 'a codec -> ('a, string) result
+val push_field : state -> string -> 'a to_lua -> 'a -> unit
+val get_field : state -> int -> string -> 'a of_lua -> ('a, string) result
+val get_index : state -> int -> int -> 'a of_lua -> ('a, string) result
 val create : unit -> state
 val add_function : state -> string -> Lua_api_lib.oCamlFunction -> unit
-val set_global : 'a codec -> state -> string -> 'a -> unit
-val get_global : 'a codec -> state -> string -> ('a, string) result
+val set_global : state -> string -> 'a to_lua -> 'a -> unit
+val get_global : state -> string -> 'a of_lua -> ('a, string) result
 val run : state -> string -> (unit, string) result
 val run_file : state -> string -> (unit, string) result
