@@ -162,9 +162,10 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
       fun state idx ->
         if not (Lua_api.Lua.istable state idx) then
           Error
-            (Printf.sprintf "expected table for %s, got %s"
-               [%e estring ~loc type_name]
-               (Lua_api.LuaL.typename state idx))
+            (`Msg
+               (Printf.sprintf "expected table for %s, got %s"
+                  [%e estring ~loc type_name]
+                  (Lua_api.LuaL.typename state idx)))
         else
           [%e of_lua_body]]
   in
@@ -337,7 +338,7 @@ let derive_variant ~loc ~type_name ~params
     case
       ~lhs:(ppat_var ~loc { loc; txt = "s" })
       ~guard:None
-      ~rhs:[%expr Error (Printf.sprintf "unknown variant tag: %s" s)]
+      ~rhs:[%expr Error (`Msg (Printf.sprintf "unknown variant tag: %s" s))]
   in
   let all_of_cases = of_lua_cases @ [ wildcard_case ] in
   let of_lua_fn_body =
@@ -345,12 +346,13 @@ let derive_variant ~loc ~type_name ~params
       fun state idx ->
         if not (Lua_api.Lua.istable state idx) then
           Error
-            (Printf.sprintf "expected table for %s, got %s"
-               [%e estring ~loc type_name]
-               (Lua_api.LuaL.typename state idx))
+            (`Msg
+               (Printf.sprintf "expected table for %s, got %s"
+                  [%e estring ~loc type_name]
+                  (Lua_api.LuaL.typename state idx)))
         else (
           match Ezlua.get_field state idx "tag" Ezlua.Decode.string with
-          | Error e -> Error ("missing tag: " ^ e)
+          | Error (`Msg e) -> Error (`Msg ("missing tag: " ^ e))
           | Ok tag__ -> [%e pexp_match ~loc [%expr tag__] all_of_cases]
         )]
   in
@@ -508,7 +510,7 @@ let expand_lua_let ~loc ~path:_ pat expr =
         let dec = decode_expr_of_type ~loc ct in
         [%expr
           match [%e dec] lua_state [%e eint ~loc i] with
-          | Error msg ->
+          | Error (`Msg msg) ->
             LuaL.error lua_state "%s"
               [%e
                 estring ~loc (Printf.sprintf "bad arg %d (%s): " i pname)

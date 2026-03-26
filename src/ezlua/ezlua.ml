@@ -2,7 +2,10 @@ open Lua_api
 
 type state = Lua_api_lib.state
 type 'a to_lua = state -> 'a -> unit
-type 'a of_lua = state -> int -> ('a, string) result
+type error = [ `Msg of string ]
+type 'a of_lua = state -> int -> ('a, error) result
+
+let pp_error ppf (`Msg s) = Format.pp_print_string ppf s
 
 module Encode = struct
   let int state v = Lua.pushinteger state v
@@ -42,26 +45,33 @@ module Decode = struct
     if Lua.isnumber state idx then
       Ok (Lua.tointeger state idx)
     else
-      Error (Printf.sprintf "expected number, got %s" (LuaL.typename state idx))
+      Error
+        (`Msg
+           (Printf.sprintf "expected number, got %s" (LuaL.typename state idx)))
 
   let float state idx =
     if Lua.isnumber state idx then
       Ok (Lua.tonumber state idx)
     else
-      Error (Printf.sprintf "expected number, got %s" (LuaL.typename state idx))
+      Error
+        (`Msg
+           (Printf.sprintf "expected number, got %s" (LuaL.typename state idx)))
 
   let string state idx =
     match Lua.tostring state idx with
     | Some s -> Ok s
     | None ->
-      Error (Printf.sprintf "expected string, got %s" (LuaL.typename state idx))
+      Error
+        (`Msg
+           (Printf.sprintf "expected string, got %s" (LuaL.typename state idx)))
 
   let bool state idx =
     if Lua.isboolean state idx then
       Ok (Lua.toboolean state idx)
     else
       Error
-        (Printf.sprintf "expected boolean, got %s" (LuaL.typename state idx))
+        (`Msg
+           (Printf.sprintf "expected boolean, got %s" (LuaL.typename state idx)))
 
   let unit_ _state _idx = Ok ()
 
@@ -70,8 +80,9 @@ module Decode = struct
       Ok None
     else if not (Lua.istable state idx) then
       Error
-        (Printf.sprintf "expected nil or table for option, got %s"
-           (LuaL.typename state idx))
+        (`Msg
+           (Printf.sprintf "expected nil or table for option, got %s"
+              (LuaL.typename state idx)))
     else (
       Lua.rawgeti state idx 1;
       let result = dec state (-1) in
@@ -83,7 +94,9 @@ module Decode = struct
 
   let list dec state idx =
     if not (Lua.istable state idx) then
-      Error (Printf.sprintf "expected table, got %s" (LuaL.typename state idx))
+      Error
+        (`Msg
+           (Printf.sprintf "expected table, got %s" (LuaL.typename state idx)))
     else (
       let rec loop i acc =
         Lua.rawgeti state idx i;
@@ -92,9 +105,9 @@ module Decode = struct
           Ok (List.rev acc)
         ) else (
           match dec state (-1) with
-          | Error e ->
+          | Error (`Msg e) ->
             Lua.pop state 1;
-            Error (Printf.sprintf "list[%d]: %s" i e)
+            Error (`Msg (Printf.sprintf "list[%d]: %s" i e))
           | Ok v ->
             Lua.pop state 1;
             loop (i + 1) (v :: acc)
@@ -110,19 +123,21 @@ module Decode = struct
 
   let pair dec_a dec_b state idx =
     if not (Lua.istable state idx) then
-      Error (Printf.sprintf "expected table, got %s" (LuaL.typename state idx))
+      Error
+        (`Msg
+           (Printf.sprintf "expected table, got %s" (LuaL.typename state idx)))
     else (
       Lua.rawgeti state idx 1;
       let ra = dec_a state (-1) in
       Lua.pop state 1;
       match ra with
-      | Error e -> Error ("pair.1: " ^ e)
+      | Error (`Msg e) -> Error (`Msg ("pair.1: " ^ e))
       | Ok a ->
         Lua.rawgeti state idx 2;
         let rb = dec_b state (-1) in
         Lua.pop state 1;
         (match rb with
-        | Error e -> Error ("pair.2: " ^ e)
+        | Error (`Msg e) -> Error (`Msg ("pair.2: " ^ e))
         | Ok b -> Ok (a, b))
     )
 end
@@ -138,7 +153,7 @@ let get_field state idx name of_lua_fn =
   let result = of_lua_fn state (-1) in
   Lua.pop state 1;
   match result with
-  | Error e -> Error (Printf.sprintf "field '%s': %s" name e)
+  | Error (`Msg e) -> Error (`Msg (Printf.sprintf "field '%s': %s" name e))
   | Ok v -> Ok v
 
 let get_index state idx i of_lua_fn =
@@ -146,7 +161,7 @@ let get_index state idx i of_lua_fn =
   let result = of_lua_fn state (-1) in
   Lua.pop state 1;
   match result with
-  | Error e -> Error (Printf.sprintf "index %d: %s" i e)
+  | Error (`Msg e) -> Error (`Msg (Printf.sprintf "index %d: %s" i e))
   | Ok v -> Ok v
 
 (* High-level API *)
@@ -175,7 +190,7 @@ let pop_error state =
     | None -> "unknown Lua error"
   in
   Lua.pop state 1;
-  Error msg
+  Error (`Msg msg)
 
 let run state code =
   if LuaL.dostring state code then

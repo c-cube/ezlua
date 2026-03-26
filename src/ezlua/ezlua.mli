@@ -1,6 +1,9 @@
 type state = Lua_api_lib.state
 type 'a to_lua = state -> 'a -> unit
-type 'a of_lua = state -> int -> ('a, string) result
+type error = [ `Msg of string ]
+type 'a of_lua = state -> int -> ('a, error) result
+
+val pp_error : Format.formatter -> error -> unit
 
 module Encode : sig
   val int : int to_lua
@@ -27,11 +30,11 @@ module Decode : sig
 end
 
 val push_field : state -> string -> 'a to_lua -> 'a -> unit
-val get_field : state -> int -> string -> 'a of_lua -> ('a, string) result
-val get_index : state -> int -> int -> 'a of_lua -> ('a, string) result
+val get_field : state -> int -> string -> 'a of_lua -> ('a, error) result
+val get_index : state -> int -> int -> 'a of_lua -> ('a, error) result
 val create : ?stdlib:bool -> unit -> state
 val add_function : state -> string -> Lua_api_lib.oCamlFunction -> unit
 val set_global : state -> string -> 'a to_lua -> 'a -> unit
-val get_global : state -> string -> 'a of_lua -> ('a, string) result
-val run : state -> string -> (unit, string) result
-val run_file : state -> string -> (unit, string) result
+val get_global : state -> string -> 'a of_lua -> ('a, error) result
+val run : state -> string -> (unit, error) result
+val run_file : state -> string -> (unit, error) result

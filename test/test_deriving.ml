@@ -52,7 +52,7 @@ let () =
 
 let check_ok msg = function
   | Ok x -> x
-  | Error e -> Alcotest.failf "%s: Error: %s" msg e
+  | Error e -> Alcotest.failf "%s: Error: %a" msg Ezlua.pp_error e
 
 (* ------------------------------------------------------------------ *)
 
@@ -174,7 +174,7 @@ let test_let_lua () =
   Ezlua.add_function state "greet" greet_lua;
   let result = Ezlua.run state {|result = add(10, 32)|} in
   (match result with
-  | Error e -> Alcotest.failf "run error: %s" e
+  | Error e -> Alcotest.failf "run error: %a" Ezlua.pp_error e
   | Ok () -> ());
   let n =
     check_ok "get result" (Ezlua.get_global state "result" Ezlua.Decode.int)
@@ -182,7 +182,7 @@ let test_let_lua () =
   Alcotest.(check int) "add result" 42 n;
   let result2 = Ezlua.run state {|msg = greet("World")|} in
   (match result2 with
-  | Error e -> Alcotest.failf "run error: %s" e
+  | Error e -> Alcotest.failf "run error: %a" Ezlua.pp_error e
   | Ok () -> ());
   let msg =
     check_ok "get msg" (Ezlua.get_global state "msg" Ezlua.Decode.string)
@@ -194,7 +194,7 @@ let test_ezlua_smoke () =
   Ezlua.set_global state "x" Ezlua.Encode.int 42;
   let result = Ezlua.run state {|assert(x == 42)|} in
   (match result with
-  | Error e -> Alcotest.failf "smoke test: %s" e
+  | Error e -> Alcotest.failf "smoke test: %a" Ezlua.pp_error e
   | Ok () -> ());
   let v = check_ok "get x" (Ezlua.get_global state "x" Ezlua.Decode.int) in
   Alcotest.(check int) "x" 42 v
