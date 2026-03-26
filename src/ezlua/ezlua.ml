@@ -151,9 +151,9 @@ let get_index state idx i of_lua_fn =
 
 (* High-level API *)
 
-let create () =
+let create ?(stdlib = true) () =
   let state = LuaL.newstate () in
-  LuaL.openlibs state;
+  if stdlib then LuaL.openlibs state;
   state
 
 let add_function state name f = Lua.register state name f

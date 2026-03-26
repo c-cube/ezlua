@@ -29,7 +29,7 @@ end
 val push_field : state -> string -> 'a to_lua -> 'a -> unit
 val get_field : state -> int -> string -> 'a of_lua -> ('a, string) result
 val get_index : state -> int -> int -> 'a of_lua -> ('a, string) result
-val create : unit -> state
+val create : ?stdlib:bool -> unit -> state
 val add_function : state -> string -> Lua_api_lib.oCamlFunction -> unit
 val set_global : state -> string -> 'a to_lua -> 'a -> unit
 val get_global : state -> string -> 'a of_lua -> ('a, string) result
