@@ -1,0 +1,5 @@
+(executable
+ (name chat_server)
+ (libraries ezlua lwt lwt.unix)
+ (preprocess
+  (pps ppx_ezlua)))
