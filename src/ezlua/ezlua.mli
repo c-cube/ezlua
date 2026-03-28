@@ -93,6 +93,9 @@ val get_field : state -> int -> string -> 'a of_lua -> ('a, error) result
 val get_index : state -> int -> int -> 'a of_lua -> ('a, error) result
 (** Read the integer-keyed entry [i] from the table at stack position [idx]. *)
 
+val get_stack : state -> int -> 'a of_lua -> ('a, error) result
+(** Read the value at stack position [idx] *)
+
 val create : ?stdlib:bool -> unit -> state
 (** Create a new Lua state. [stdlib] defaults to [true]; pass [~stdlib:false] to
     skip loading the standard libraries. *)

@@ -2,6 +2,7 @@
  (name ppx_ezlua)
  (public_name ppx_ezlua)
  (kind ppx_rewriter)
- (libraries ppxlib ezlua ocaml-lua)
+ (ppx_runtime_libraries ezlua ocaml-lua)
+ (libraries ppxlib)
  (preprocess
   (pps ppxlib.metaquot)))

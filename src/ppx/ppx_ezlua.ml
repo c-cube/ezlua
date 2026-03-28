@@ -24,7 +24,7 @@ let rec encode_expr_of_type (ct : core_type) : expression =
     let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.option [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
-    let base = pexp_ident ~loc { loc; txt = Lident ("to_lua_" ^ name) } in
+    let base = pexp_ident ~loc { loc; txt = Lident (name ^ "_to_lua") } in
     List.fold_left
       (fun acc arg -> pexp_apply ~loc acc [ Nolabel, encode_expr_of_type arg ])
       base args
@@ -58,7 +58,7 @@ let rec decode_expr_of_type (ct : core_type) : expression =
     let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.option [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
-    let base = pexp_ident ~loc { loc; txt = Lident ("of_lua_" ^ name) } in
+    let base = pexp_ident ~loc { loc; txt = Lident (name ^ "_of_lua") } in
     List.fold_left
       (fun acc arg -> pexp_apply ~loc acc [ Nolabel, decode_expr_of_type arg ])
       base args
@@ -170,8 +170,8 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
         else
           [%e of_lua_body]]
   in
-  let to_lua_name = "to_lua_" ^ type_name in
-  let of_lua_name = "of_lua_" ^ type_name in
+  let to_lua_name = type_name ^ "_to_lua" in
+  let of_lua_name = type_name ^ "_of_lua" in
   [
     [%stri
       let [%p ppat_var ~loc { loc; txt = to_lua_name }] =
@@ -521,7 +521,7 @@ let expand_lua_let ~loc ~path:_ pat expr =
         [%expr
           match [%e dec] lua_state [%e eint ~loc:ploc i] with
           | Error (`Msg msg) ->
-            LuaL.error lua_state "%s"
+            Lua_api.LuaL.error lua_state "%s"
               [%e
                 estring ~loc:ploc (Printf.sprintf "bad arg %d (%s): " i pname)
                 |> fun prefix -> [%expr [%e prefix] ^ msg]]

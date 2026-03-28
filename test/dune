@@ -1,5 +1,6 @@
 (test
  (name test_deriving)
  (libraries ezlua alcotest unix)
+ (package ppx_ezlua)
  (preprocess
-  (pps ppx_ezlua)))
+  (pps ppx_ezlua ppx_deriving.std)))

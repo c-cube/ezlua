@@ -170,6 +170,12 @@ let get_index state idx i of_lua_fn =
   | Error (`Msg e) -> Error (`Msg (Printf.sprintf "index %d: %s" i e))
   | Ok v -> Ok v
 
+let get_stack state idx of_lua_fn =
+  let result = of_lua_fn state idx in
+  match result with
+  | Error (`Msg e) -> Error (`Msg (Printf.sprintf "stack %d: %s" idx e))
+  | Ok v -> Ok v
+
 (* High-level API *)
 
 let create ?(stdlib = true) () =

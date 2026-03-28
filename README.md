@@ -10,7 +10,7 @@ callbacks.
 
 ### `[@@deriving ezlua]`
 
-Annotate a type declaration to generate `to_lua_<name>` and `of_lua_<name>`
+Annotate a type declaration to generate `<name>_to_lua` and `<name>_of_lua`
 functions automatically.
 
 Records become Lua tables keyed by field name. Variants become tables with a
@@ -24,13 +24,13 @@ type point = {
 [@@deriving ezlua]
 
 (* generates:
-   val to_lua_point : point Ezlua.to_lua
-   val of_lua_point : point Ezlua.of_lua *)
+   val point_to_lua : point Ezlua.to_lua
+   val point_of_lua : point Ezlua.of_lua *)
 
 let () =
   let state = Ezlua.create () in
   let p = { x = 1.0; y = 2.5 } in
-  Ezlua.set_global state "p" to_lua_point p;
+  Ezlua.set_global state "p" point_to_lua p;
   ignore (Ezlua.run state "assert(p.x == 1.0 and p.y == 2.5)")
 ```
 

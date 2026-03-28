@@ -30,4 +30,6 @@
   (ocaml (>= 4.14))
   dune
   ppxlib
-  ezlua))
+  ezlua
+  (ppx_deriving :with-test)
+  (alcotest :with-test)))

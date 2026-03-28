@@ -33,21 +33,6 @@ type score = {
 
 type opt_test = { maybe: string option } [@@deriving ezlua]
 
-let () =
-  ignore
-    ( to_lua_person,
-      of_lua_person,
-      to_lua_color,
-      of_lua_color,
-      to_lua_shape,
-      of_lua_shape,
-      to_lua_wrapped,
-      of_lua_wrapped,
-      to_lua_score,
-      of_lua_score,
-      to_lua_opt_test,
-      of_lua_opt_test )
-
 (* ------------------------------------------------------------------ *)
 
 let check_ok msg = function
@@ -59,9 +44,9 @@ let check_ok msg = function
 let test_person_roundtrip () =
   let state = Ezlua.create () in
   let p = { name = "Alice"; age = 30; active = true } in
-  Ezlua.set_global state "p" to_lua_person p;
+  Ezlua.set_global state "p" person_to_lua p;
   let p2 =
-    check_ok "person roundtrip" (Ezlua.get_global state "p" of_lua_person)
+    check_ok "person roundtrip" (Ezlua.get_global state "p" person_of_lua)
   in
   Alcotest.(check string) "name" p.name p2.name;
   Alcotest.(check int) "age" p.age p2.age;
@@ -72,7 +57,7 @@ let test_person_from_lua () =
   let ok = LuaL.dostring state {|p = {name="Bob", age=25, active=false}|} in
   if not ok then Alcotest.fail "lua error";
   let p =
-    check_ok "person from lua" (Ezlua.get_global state "p" of_lua_person)
+    check_ok "person from lua" (Ezlua.get_global state "p" person_of_lua)
   in
   Alcotest.(check string) "name" "Bob" p.name;
   Alcotest.(check int) "age" 25 p.age;
@@ -122,10 +107,10 @@ let test_shape_from_lua () =
 let test_wrapped_roundtrip () =
   let state = Ezlua.create () in
   let w = { value = 42; label = "answer" } in
-  Ezlua.set_global state "w" (to_lua_wrapped Ezlua.Encode.int) w;
+  Ezlua.set_global state "w" (wrapped_to_lua Ezlua.Encode.int) w;
   let w2 =
     check_ok "wrapped roundtrip"
-      (Ezlua.get_global state "w" (of_lua_wrapped Ezlua.Decode.int))
+      (Ezlua.get_global state "w" (wrapped_of_lua Ezlua.Decode.int))
   in
   Alcotest.(check int) "value" w.value w2.value;
   Alcotest.(check string) "label" w.label w2.label
@@ -133,9 +118,9 @@ let test_wrapped_roundtrip () =
 let test_score_roundtrip () =
   let state = Ezlua.create () in
   let s = { player = "player1"; points = [ 10; 20; 30 ] } in
-  Ezlua.set_global state "s" to_lua_score s;
+  Ezlua.set_global state "s" score_to_lua s;
   let s2 =
-    check_ok "score roundtrip" (Ezlua.get_global state "s" of_lua_score)
+    check_ok "score roundtrip" (Ezlua.get_global state "s" score_of_lua)
   in
   Alcotest.(check string) "player" s.player s2.player;
   Alcotest.(check (list int)) "points" s.points s2.points
@@ -143,12 +128,12 @@ let test_score_roundtrip () =
 let test_opt_roundtrip () =
   let state = Ezlua.create () in
   let t1 = { maybe = Some "hello" } in
-  Ezlua.set_global state "t" to_lua_opt_test t1;
-  let t2 = check_ok "opt some" (Ezlua.get_global state "t" of_lua_opt_test) in
+  Ezlua.set_global state "t" opt_test_to_lua t1;
+  let t2 = check_ok "opt some" (Ezlua.get_global state "t" opt_test_of_lua) in
   Alcotest.(check (option string)) "some" t1.maybe t2.maybe;
   let t3 = { maybe = None } in
-  Ezlua.set_global state "t" to_lua_opt_test t3;
-  let t4 = check_ok "opt none" (Ezlua.get_global state "t" of_lua_opt_test) in
+  Ezlua.set_global state "t" opt_test_to_lua t3;
+  let t4 = check_ok "opt none" (Ezlua.get_global state "t" opt_test_of_lua) in
   Alcotest.(check (option string)) "none" None t4.maybe
 
 let test_nested_option () =
@@ -199,6 +184,30 @@ let test_ezlua_smoke () =
   let v = check_ok "get x" (Ezlua.get_global state "x" Ezlua.Decode.int) in
   Alcotest.(check int) "x" 42 v
 
+type foo = {
+  x: int;
+  y: int;
+  swap: bool;
+}
+[@@deriving ezlua, eq, show]
+
+let%lua swap_foo (self : foo) : foo =
+  if self.swap then
+    { self with x = self.y; y = self.x }
+  else
+    self
+
+(* test function takes a complex type *)
+let test_foo () =
+  let st = Ezlua.create () in
+  Ezlua.add_function st "swap" swap_foo_lua;
+  Ezlua.run st "return swap({x=41, y=5; swap=true})" |> Ezlua.unwrap_err;
+  let x = Ezlua.get_stack st (-1) foo_of_lua |> Ezlua.unwrap_err in
+  Alcotest.(check (testable pp_foo equal_foo))
+    "x"
+    { x = 5; y = 41; swap = true }
+    x
+
 let test_stress () =
   let t_start = Unix.gettimeofday () in
   let minor_start = Gc.minor_words () in
@@ -242,5 +251,6 @@ let () =
         ] );
       "let_lua", [ test_case "callback" `Quick test_let_lua ];
       "ezlua_smoke", [ test_case "smoke" `Quick test_ezlua_smoke ];
+      "ezlua_foo", [ test_case "foo" `Quick test_foo ];
       "stress", [ test_case "stress" `Quick test_stress ];
     ]
