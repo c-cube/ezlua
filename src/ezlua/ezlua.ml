@@ -7,6 +7,10 @@ type 'a of_lua = state -> int -> ('a, error) result
 
 let pp_error ppf (`Msg s) = Format.pp_print_string ppf s
 
+let[@inline] unwrap_err = function
+  | Ok x -> x
+  | Error (`Msg e) -> failwith e
+
 module Encode = struct
   let int state v = Lua.pushinteger state v
   let float state v = Lua.pushnumber state v
