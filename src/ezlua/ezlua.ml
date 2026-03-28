@@ -148,6 +148,8 @@ end
 
 (* Table helpers used by generated code *)
 
+let push_table state = Lua.newtable state
+
 let push_field state name to_lua_fn v =
   to_lua_fn state v;
   Lua.setfield state (-2) name

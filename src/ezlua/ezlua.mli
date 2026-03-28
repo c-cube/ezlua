@@ -1,11 +1,22 @@
+(** Helpers to make the [lua] bindings more ergonomic *)
+
 type state = Lua_api_lib.state
+(** A lua interpreter instance. Not thread safe. All lua state, globals,
+    definitions, etc belongs in a given state. Multiple states can be created.
+*)
+
 type 'a to_lua = state -> 'a -> unit
+(** Turn a OCaml value into a lua value *)
+
 type error = [ `Msg of string ]
+
 type 'a of_lua = state -> int -> ('a, error) result
+(** Convert a lua value into an OCaml value, or fail *)
 
 val pp_error : Format.formatter -> error -> unit
 (** Pretty-print an [error]. *)
 
+(** Encode to lua *)
 module Encode : sig
   val int : int to_lua
   (** Push an integer onto the Lua stack. *)
@@ -35,6 +46,10 @@ module Encode : sig
   (** Push a pair as a two-element Lua table [{a, b}]. *)
 end
 
+(** Decode from lua.
+
+    Decoding always take the index of the value to decode in the lua stack. The
+    top of the stack is at [(-1)]. *)
 module Decode : sig
   val int : int of_lua
   (** Read an integer from stack position [idx]. *)
@@ -52,7 +67,8 @@ module Decode : sig
   (** Always succeeds, ignoring the value at [idx]. *)
 
   val option : 'a of_lua -> 'a option of_lua
-  (** Decode [nil] or none as [None]; a single-element table [{x}] as [Some x]. *)
+  (** Decode [nil] or none as [None]; a single-element table [{x}] as [Some x].
+  *)
 
   val list : 'a of_lua -> 'a list of_lua
   (** Decode a 1-indexed Lua table as a list, stopping at the first [nil]. *)
@@ -63,6 +79,9 @@ module Decode : sig
   val pair : 'a of_lua -> 'b of_lua -> ('a * 'b) of_lua
   (** Decode a two-element Lua table as a pair. *)
 end
+
+val push_table : state -> unit
+(** Push an empty table on top of the stack *)
 
 val push_field : state -> string -> 'a to_lua -> 'a -> unit
 (** Push a value with [to_lua] and set it as a named field on the table at the
@@ -82,7 +101,10 @@ val unwrap_err : ('a, error) result -> 'a
 (** Return the [Ok] value, or [failwith] the error message. *)
 
 val add_function : state -> string -> Lua_api_lib.oCamlFunction -> unit
-(** Register an OCaml function as a Lua global. *)
+(** Register an OCaml function as a Lua global.
+
+    A function is of type [state -> int]. Use [let%lua] with the ppx to easily
+    export OCaml functions to lua. *)
 
 val set_global : state -> string -> 'a to_lua -> 'a -> unit
 (** Push a value with [to_lua] and assign it to a Lua global variable. *)
