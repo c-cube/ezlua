@@ -5,7 +5,8 @@ open Ast_builder.Default
 (* Helpers *)
 (* ------------------------------------------------------------------ *)
 
-let rec encode_expr_of_type ~loc (ct : core_type) : expression =
+let rec encode_expr_of_type (ct : core_type) : expression =
+  let loc = ct.ptyp_loc in
   match ct.ptyp_desc with
   | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr Ezlua.Encode.int]
   | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr Ezlua.Encode.float]
@@ -14,33 +15,34 @@ let rec encode_expr_of_type ~loc (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr Ezlua.Encode.bool]
   | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Encode.unit_]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ arg ]) ->
-    let inner = encode_expr_of_type ~loc arg in
+    let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.list [%e inner]]
   | Ptyp_constr ({ txt = Lident "array"; _ }, [ arg ]) ->
-    let inner = encode_expr_of_type ~loc arg in
+    let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.array [%e inner]]
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
-    let inner = encode_expr_of_type ~loc arg in
+    let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.option [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident ("to_lua_" ^ name) } in
     List.fold_left
       (fun acc arg ->
-        pexp_apply ~loc acc [ Nolabel, encode_expr_of_type ~loc arg ])
+        pexp_apply ~loc acc [ Nolabel, encode_expr_of_type arg ])
       base args
   | Ptyp_var name -> pexp_ident ~loc { loc; txt = Lident ("encode_" ^ name) }
   | Ptyp_tuple elems ->
     (match elems with
     | [ a; b ] ->
       [%expr
-        Ezlua.Encode.pair [%e encode_expr_of_type ~loc a]
-          [%e encode_expr_of_type ~loc b]]
+        Ezlua.Encode.pair [%e encode_expr_of_type a]
+          [%e encode_expr_of_type b]]
     | _ ->
       Location.raise_errorf ~loc
         "ppx_ezlua: tuples with arity != 2 not supported")
   | _ -> Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
 
-let rec decode_expr_of_type ~loc (ct : core_type) : expression =
+let rec decode_expr_of_type (ct : core_type) : expression =
+  let loc = ct.ptyp_loc in
   match ct.ptyp_desc with
   | Ptyp_constr ({ txt = Lident "int"; _ }, []) -> [%expr Ezlua.Decode.int]
   | Ptyp_constr ({ txt = Lident "float"; _ }, []) -> [%expr Ezlua.Decode.float]
@@ -49,27 +51,27 @@ let rec decode_expr_of_type ~loc (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr Ezlua.Decode.bool]
   | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Decode.unit_]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ arg ]) ->
-    let inner = decode_expr_of_type ~loc arg in
+    let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.list [%e inner]]
   | Ptyp_constr ({ txt = Lident "array"; _ }, [ arg ]) ->
-    let inner = decode_expr_of_type ~loc arg in
+    let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.array [%e inner]]
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
-    let inner = decode_expr_of_type ~loc arg in
+    let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.option [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident ("of_lua_" ^ name) } in
     List.fold_left
       (fun acc arg ->
-        pexp_apply ~loc acc [ Nolabel, decode_expr_of_type ~loc arg ])
+        pexp_apply ~loc acc [ Nolabel, decode_expr_of_type arg ])
       base args
   | Ptyp_var name -> pexp_ident ~loc { loc; txt = Lident ("decode_" ^ name) }
   | Ptyp_tuple elems ->
     (match elems with
     | [ a; b ] ->
       [%expr
-        Ezlua.Decode.pair [%e decode_expr_of_type ~loc a]
-          [%e decode_expr_of_type ~loc b]]
+        Ezlua.Decode.pair [%e decode_expr_of_type a]
+          [%e decode_expr_of_type b]]
     | _ ->
       Location.raise_errorf ~loc
         "ppx_ezlua: tuples with arity != 2 not supported")
@@ -112,9 +114,10 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
     let field_pushes =
       List.map
         (fun ld ->
+          let loc = ld.pld_loc in
           let fname = ld.pld_name.txt in
           let ftype = ld.pld_type in
-          let enc = encode_expr_of_type ~loc ftype in
+          let enc = encode_expr_of_type ftype in
           let fexpr = pexp_field ~loc [%expr v] { loc; txt = Lident fname } in
           [%expr
             Ezlua.push_field state [%e estring ~loc fname] [%e enc] [%e fexpr]])
@@ -138,6 +141,7 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
     let record_fields =
       List.map
         (fun ld ->
+          let loc = ld.pld_loc in
           let fname = ld.pld_name.txt in
           ( { loc; txt = Lident fname },
             pexp_ident ~loc { loc; txt = Lident fname } ))
@@ -148,8 +152,9 @@ let derive_record ~loc ~type_name ~params (fields : label_declaration list) =
   let of_lua_body =
     List.fold_right
       (fun ld inner ->
+        let loc = ld.pld_loc in
         let fname = ld.pld_name.txt in
-        let dec = decode_expr_of_type ~loc ld.pld_type in
+        let dec = decode_expr_of_type ld.pld_type in
         [%expr
           match Ezlua.get_field state idx [%e estring ~loc fname] [%e dec] with
           | Error e -> Error e
@@ -191,6 +196,7 @@ let derive_variant ~loc ~type_name ~params
   let to_lua_cases =
     List.map
       (fun cd ->
+        let loc = cd.pcd_loc in
         let cname = cd.pcd_name.txt in
         match cd.pcd_args with
         | Pcstr_tuple [] ->
@@ -208,7 +214,7 @@ let derive_variant ~loc ~type_name ~params
               { loc; txt = Lident cname }
               (Some (ppat_var ~loc { loc; txt = "v0" }))
           in
-          let enc = encode_expr_of_type ~loc single in
+          let enc = encode_expr_of_type single in
           let body =
             [%expr
               Lua_api.Lua.newtable state;
@@ -232,7 +238,7 @@ let derive_variant ~loc ~type_name ~params
           let push_elems =
             List.mapi
               (fun i (ct, vn) ->
-                let enc = encode_expr_of_type ~loc ct in
+                let enc = encode_expr_of_type ct in
                 let v = pexp_ident ~loc { loc; txt = Lident vn } in
                 [%expr
                   [%e enc] state [%e v];
@@ -269,6 +275,7 @@ let derive_variant ~loc ~type_name ~params
   let of_lua_cases =
     List.map
       (fun cd ->
+        let loc = cd.pcd_loc in
         let cname = cd.pcd_name.txt in
         match cd.pcd_args with
         | Pcstr_tuple [] ->
@@ -280,7 +287,7 @@ let derive_variant ~loc ~type_name ~params
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_tuple [ single ] ->
           let pat = ppat_constant ~loc (Pconst_string (cname, loc, None)) in
-          let dec = decode_expr_of_type ~loc single in
+          let dec = decode_expr_of_type single in
           let body =
             [%expr
               match Ezlua.get_field state idx "value" [%e dec] with
@@ -300,7 +307,7 @@ let derive_variant ~loc ~type_name ~params
           let get_elems =
             List.fold_right
               (fun (i, (ct, vn)) inner ->
-                let dec = decode_expr_of_type ~loc ct in
+                let dec = decode_expr_of_type ct in
                 [%expr
                   match
                     Ezlua.get_index state arr_idx__ [%e eint ~loc i] [%e dec]
@@ -380,21 +387,22 @@ let derive_alias ~loc ~type_name ~params (manifest : core_type) =
       let [%p ppat_var ~loc { loc; txt = to_lua_name }] =
         [%e
           wrap_with_encode_params ~loc param_names
-            (encode_expr_of_type ~loc manifest)]];
+            (encode_expr_of_type manifest)]];
     [%stri
       let [%p ppat_var ~loc { loc; txt = of_lua_name }] =
         [%e
           wrap_with_decode_params ~loc param_names
-            (decode_expr_of_type ~loc manifest)]];
+            (decode_expr_of_type manifest)]];
   ]
 
 (* ------------------------------------------------------------------ *)
 (* Deriver registration *)
 (* ------------------------------------------------------------------ *)
 
-let generate_impl ~loc ~path:_ (_rec_flag, type_decls) =
+let generate_impl ~loc:_ ~path:_ (_rec_flag, type_decls) =
   List.concat_map
     (fun td ->
+      let loc = td.ptype_loc in
       let type_name = td.ptype_name.txt in
       let params = td.ptype_params in
       match td.ptype_kind with
@@ -476,7 +484,10 @@ let expand_lua_let ~loc ~path:_ pat expr =
   let orig_fn =
     List.fold_right
       (fun (pname, ct) acc ->
-        let p = ppat_constraint ~loc (ppat_var ~loc { loc; txt = pname }) ct in
+        let ploc = ct.ptyp_loc in
+        let p =
+          ppat_constraint ~loc:ploc (ppat_var ~loc:ploc { loc = ploc; txt = pname }) ct
+        in
         pexp_fun ~loc Nolabel None p acc)
       params
       (pexp_constraint ~loc body ret_type)
@@ -499,7 +510,7 @@ let expand_lua_let ~loc ~path:_ pat expr =
             ignore result__;
             0]
         | _ ->
-          let ret_enc = encode_expr_of_type ~loc ret_type in
+          let ret_enc = encode_expr_of_type ret_type in
           [%expr
             [%e ret_enc] lua_state result__;
             1]]]
@@ -507,16 +518,18 @@ let expand_lua_let ~loc ~path:_ pat expr =
   let wrapper_body =
     List.fold_right
       (fun (i, (pname, ct)) inner ->
-        let dec = decode_expr_of_type ~loc ct in
+        let dec = decode_expr_of_type ct in
+        let ploc = ct.ptyp_loc in
         [%expr
-          match [%e dec] lua_state [%e eint ~loc i] with
+          match [%e dec] lua_state [%e eint ~loc:ploc i] with
           | Error (`Msg msg) ->
             LuaL.error lua_state "%s"
               [%e
-                estring ~loc (Printf.sprintf "bad arg %d (%s): " i pname)
+                estring ~loc:ploc (Printf.sprintf "bad arg %d (%s): " i pname)
                 |> fun prefix -> [%expr [%e prefix] ^ msg]];
             0
-          | Ok [%p ppat_var ~loc { loc; txt = pname }] -> [%e inner]])
+          | Ok [%p ppat_var ~loc:ploc { loc = ploc; txt = pname }] ->
+            [%e inner]])
       (List.mapi (fun i x -> i + 1, x) params)
       result_bind
   in
