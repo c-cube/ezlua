@@ -199,9 +199,28 @@ let test_ezlua_smoke () =
   let v = check_ok "get x" (Ezlua.get_global state "x" Ezlua.Decode.int) in
   Alcotest.(check int) "x" 42 v
 
+let test_stress () =
+  let t_start = Unix.gettimeofday () in
+  let minor_start = Gc.minor_words () in
+
+  let state = Ezlua.create () in
+  Ezlua.set_global state "x" Ezlua.Encode.int 0;
+  for _i = 1 to 1_000_000 do
+    Ezlua.run state "x = x+1" |> Ezlua.unwrap_err
+  done;
+  let x = Ezlua.get_global state "x" Ezlua.Decode.int |> Ezlua.unwrap_err in
+  Alcotest.(check int) "x" 1_000_000 x;
+
+  let elapsed = Unix.gettimeofday () -. t_start in
+  let alloc = Gc.minor_words () -. minor_start in
+  Printf.eprintf "stress test in %.3fs (%.0f minor words)\n%!" elapsed alloc;
+  ()
+
 let () =
   let open Alcotest in
-  run "ezlua"
+  run
+    ~verbose:(Sys.getenv_opt "VERBOSE" = Some "1")
+    "ezlua"
     [
       ( "person",
         [
@@ -223,4 +242,5 @@ let () =
         ] );
       "let_lua", [ test_case "callback" `Quick test_let_lua ];
       "ezlua_smoke", [ test_case "smoke" `Quick test_ezlua_smoke ];
+      "stress", [ test_case "stress" `Quick test_stress ];
     ]
