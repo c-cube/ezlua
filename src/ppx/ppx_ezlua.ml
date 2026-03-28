@@ -26,16 +26,14 @@ let rec encode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident ("to_lua_" ^ name) } in
     List.fold_left
-      (fun acc arg ->
-        pexp_apply ~loc acc [ Nolabel, encode_expr_of_type arg ])
+      (fun acc arg -> pexp_apply ~loc acc [ Nolabel, encode_expr_of_type arg ])
       base args
   | Ptyp_var name -> pexp_ident ~loc { loc; txt = Lident ("encode_" ^ name) }
   | Ptyp_tuple elems ->
     (match elems with
     | [ a; b ] ->
       [%expr
-        Ezlua.Encode.pair [%e encode_expr_of_type a]
-          [%e encode_expr_of_type b]]
+        Ezlua.Encode.pair [%e encode_expr_of_type a] [%e encode_expr_of_type b]]
     | _ ->
       Location.raise_errorf ~loc
         "ppx_ezlua: tuples with arity != 2 not supported")
@@ -62,16 +60,14 @@ let rec decode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident ("of_lua_" ^ name) } in
     List.fold_left
-      (fun acc arg ->
-        pexp_apply ~loc acc [ Nolabel, decode_expr_of_type arg ])
+      (fun acc arg -> pexp_apply ~loc acc [ Nolabel, decode_expr_of_type arg ])
       base args
   | Ptyp_var name -> pexp_ident ~loc { loc; txt = Lident ("decode_" ^ name) }
   | Ptyp_tuple elems ->
     (match elems with
     | [ a; b ] ->
       [%expr
-        Ezlua.Decode.pair [%e decode_expr_of_type a]
-          [%e decode_expr_of_type b]]
+        Ezlua.Decode.pair [%e decode_expr_of_type a] [%e decode_expr_of_type b]]
     | _ ->
       Location.raise_errorf ~loc
         "ppx_ezlua: tuples with arity != 2 not supported")
@@ -486,7 +482,9 @@ let expand_lua_let ~loc ~path:_ pat expr =
       (fun (pname, ct) acc ->
         let ploc = ct.ptyp_loc in
         let p =
-          ppat_constraint ~loc:ploc (ppat_var ~loc:ploc { loc = ploc; txt = pname }) ct
+          ppat_constraint ~loc:ploc
+            (ppat_var ~loc:ploc { loc = ploc; txt = pname })
+            ct
         in
         pexp_fun ~loc Nolabel None p acc)
       params
@@ -527,8 +525,7 @@ let expand_lua_let ~loc ~path:_ pat expr =
               [%e
                 estring ~loc:ploc (Printf.sprintf "bad arg %d (%s): " i pname)
                 |> fun prefix -> [%expr [%e prefix] ^ msg]]
-          | Ok [%p ppat_var ~loc:ploc { loc = ploc; txt = pname }] ->
-            [%e inner]])
+          | Ok [%p ppat_var ~loc:ploc { loc = ploc; txt = pname }] -> [%e inner]])
       (List.mapi (fun i x -> i + 1, x) params)
       result_bind
   in
