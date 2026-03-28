@@ -1,8 +1,8 @@
-# ezlua
+# ezlua [![build](https://github.com/c-cube/ezlua/actions/workflows/main.yml/badge.svg)](https://github.com/c-cube/ezlua/actions/workflows/main.yml)
 
 Trying to make it easier to use Lua from OCaml.
 
-## PPX
+## ppx
 
 `ppx_ezlua` provides two features: automatic encoder/decoder derivation for
 custom types, and a `let%lua` syntax for wrapping OCaml functions as Lua
