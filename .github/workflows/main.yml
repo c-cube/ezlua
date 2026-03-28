@@ -1,0 +1,32 @@
+name: build
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+jobs:
+  run:
+    name: Build
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        ocaml-compiler:
+          - 4.14.x
+          - 5.3.x
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules:
+          recursive
+    - uses: ocaml/setup-ocaml@v3
+      with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+        dune-cache: true
+        allow-prerelease-opam: true
+    - run: opam pin -n .
+    - run: opam depext -yt ocaml-lua ezlua ppx_ezlua
+    - run: opam install -t . --deps-only
+    - run: opam exec -- dune build
+    - run: opam exec -- dune runtest
