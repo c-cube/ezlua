@@ -526,8 +526,7 @@ let expand_lua_let ~loc ~path:_ pat expr =
             LuaL.error lua_state "%s"
               [%e
                 estring ~loc:ploc (Printf.sprintf "bad arg %d (%s): " i pname)
-                |> fun prefix -> [%expr [%e prefix] ^ msg]];
-            0
+                |> fun prefix -> [%expr [%e prefix] ^ msg]]
           | Ok [%p ppat_var ~loc:ploc { loc = ploc; txt = pname }] ->
             [%e inner]])
       (List.mapi (fun i x -> i + 1, x) params)
