@@ -56,7 +56,10 @@ let rec encode_expr_of_type (ct : core_type) : expression =
       in
       let body =
         List.fold_right
-          (fun e acc -> [%expr [%e e]; [%e acc]])
+          (fun e acc ->
+            [%expr
+              [%e e];
+              [%e acc]])
           ([%expr Lua_api.Lua.newtable state] :: pushes)
           [%expr ()]
       in
@@ -122,7 +125,8 @@ let rec decode_expr_of_type (ct : core_type) : expression =
         fun state idx ->
           if not (Lua_api.Lua.istable state idx) then
             Error (`Msg "expected table for tuple")
-          else [%e body]])
+          else
+            [%e body]])
   | _ -> Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
 
 (* ------------------------------------------------------------------ *)
@@ -487,17 +491,13 @@ let generate_intf ~loc:_ ~path:_ (_rec_flag, type_decls) =
       in
       let add_params base_type codec_name =
         List.fold_right
-          (fun ct acc ->
-            ptyp_arrow ~loc Nolabel (ezlua codec_name ct) acc)
+          (fun ct acc -> ptyp_arrow ~loc Nolabel (ezlua codec_name ct) acc)
           param_types
           (ezlua codec_name base_type)
       in
       let mk name type_ =
         psig_value ~loc
-          (value_description ~loc
-             ~name:{ loc; txt = name }
-             ~type_
-             ~prim:[])
+          (value_description ~loc ~name:{ loc; txt = name } ~type_ ~prim:[])
       in
       [
         mk ("to_lua_" ^ type_name) (add_params applied "to_lua");

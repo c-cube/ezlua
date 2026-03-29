@@ -160,7 +160,12 @@ module Decode = struct
         (`Msg
            (Printf.sprintf "expected table, got %s" (LuaL.typename state idx)))
     else (
-      let abs_idx = if idx < 0 then Lua.gettop state + idx + 1 else idx in
+      let abs_idx =
+        if idx < 0 then
+          Lua.gettop state + idx + 1
+        else
+          idx
+      in
       let result = ref [] in
       let err = ref None in
       Lua.pushnil state;
@@ -176,14 +181,14 @@ module Decode = struct
             | Ok v -> result := (k, v) :: !result
             | Error (`Msg e) ->
               if !err = None then
-                err :=
-                  Some
-                    (Printf.sprintf "string_table key '%s': %s" k e)));
-          Lua.pop state 1)
+                err := Some (Printf.sprintf "string_table key '%s': %s" k e)));
+          Lua.pop state 1
+        )
       done;
       match !err with
       | Some e -> Error (`Msg e)
-      | None -> Ok (List.rev !result))
+      | None -> Ok (List.rev !result)
+    )
 end
 
 (* Table helpers used by generated code *)

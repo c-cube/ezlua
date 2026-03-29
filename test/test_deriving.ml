@@ -32,7 +32,6 @@ type score = {
 [@@deriving ezlua]
 
 type opt_test = { maybe: string option } [@@deriving ezlua]
-
 type triple = int * string * bool [@@deriving ezlua]
 
 (* ------------------------------------------------------------------ *)
@@ -154,9 +153,9 @@ let test_nested_option () =
 
 let test_triple_roundtrip () =
   let state = Ezlua.create () in
-  let t = (42, "hello", true) in
+  let t = 42, "hello", true in
   Ezlua.set_global state "t" to_lua_triple t;
-  let (n, s, b) =
+  let n, s, b =
     check_ok "triple roundtrip" (Ezlua.get_global state "t" of_lua_triple)
   in
   Alcotest.(check int) "int" 42 n;
