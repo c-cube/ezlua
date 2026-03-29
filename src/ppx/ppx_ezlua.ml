@@ -23,6 +23,9 @@ let rec encode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
     let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.option [%e inner]]
+  | Ptyp_constr ({ txt = Lident "string_table"; _ }, [ arg ]) ->
+    let inner = encode_expr_of_type arg in
+    [%expr Ezlua.Encode.string_table [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident (name ^ "_to_lua") } in
     List.fold_left
@@ -35,8 +38,29 @@ let rec encode_expr_of_type (ct : core_type) : expression =
       [%expr
         Ezlua.Encode.pair [%e encode_expr_of_type a] [%e encode_expr_of_type b]]
     | _ ->
-      Location.raise_errorf ~loc
-        "ppx_ezlua: tuples with arity != 2 not supported")
+      let n = List.length elems in
+      let varnames = List.init n (fun i -> Printf.sprintf "v%d" i) in
+      let pat =
+        ppat_tuple ~loc
+          (List.map (fun vn -> ppat_var ~loc { loc; txt = vn }) varnames)
+      in
+      let pushes =
+        List.mapi
+          (fun i (ct, vn) ->
+            let enc = encode_expr_of_type ct in
+            let v = pexp_ident ~loc { loc; txt = Lident vn } in
+            [%expr
+              [%e enc] state [%e v];
+              Lua_api.Lua.rawseti state (-2) [%e eint ~loc (i + 1)]])
+          (List.combine elems varnames)
+      in
+      let body =
+        List.fold_right
+          (fun e acc -> [%expr [%e e]; [%e acc]])
+          ([%expr Lua_api.Lua.newtable state] :: pushes)
+          [%expr ()]
+      in
+      [%expr fun state [%p pat] -> [%e body]])
   | _ -> Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
 
 let rec decode_expr_of_type (ct : core_type) : expression =
@@ -57,6 +81,9 @@ let rec decode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
     let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.option [%e inner]]
+  | Ptyp_constr ({ txt = Lident "string_table"; _ }, [ arg ]) ->
+    let inner = decode_expr_of_type arg in
+    [%expr Ezlua.Decode.string_table [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
     let base = pexp_ident ~loc { loc; txt = Lident (name ^ "_of_lua") } in
     List.fold_left
@@ -69,8 +96,33 @@ let rec decode_expr_of_type (ct : core_type) : expression =
       [%expr
         Ezlua.Decode.pair [%e decode_expr_of_type a] [%e decode_expr_of_type b]]
     | _ ->
-      Location.raise_errorf ~loc
-        "ppx_ezlua: tuples with arity != 2 not supported")
+      let n = List.length elems in
+      let varnames = List.init n (fun i -> Printf.sprintf "v%d" i) in
+      let result =
+        [%expr
+          Ok
+            [%e
+              pexp_tuple ~loc
+                (List.map
+                   (fun vn -> pexp_ident ~loc { loc; txt = Lident vn })
+                   varnames)]]
+      in
+      let body =
+        List.fold_right
+          (fun (i, (ct, vn)) inner ->
+            let dec = decode_expr_of_type ct in
+            [%expr
+              match Ezlua.get_index state idx [%e eint ~loc i] [%e dec] with
+              | Error e -> Error e
+              | Ok [%p ppat_var ~loc { loc; txt = vn }] -> [%e inner]])
+          (List.mapi (fun i x -> i + 1, x) (List.combine elems varnames))
+          result
+      in
+      [%expr
+        fun state idx ->
+          if not (Lua_api.Lua.istable state idx) then
+            Error (`Msg "expected table for tuple")
+          else [%e body]])
   | _ -> Location.raise_errorf ~loc "ppx_ezlua: unsupported type"
 
 (* ------------------------------------------------------------------ *)
