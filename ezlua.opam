@@ -12,7 +12,6 @@ depends: [
   "dune" {>= "3.0"}
   "ocaml-lua"
   "alcotest" {with-test}
-  "unix" {with-test}
   "odoc" {with-doc}
 ]
 build: [

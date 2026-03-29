@@ -12,6 +12,7 @@ depends: [
   "dune" {>= "3.0"}
   "ppxlib"
   "ezlua"
+  "base-unix" {with-test}
   "ppx_deriving" {with-test}
   "alcotest" {with-test}
   "odoc" {with-doc}

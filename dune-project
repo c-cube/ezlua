@@ -22,8 +22,7 @@
   (ocaml (>= 4.14))
   dune
   ocaml-lua
-  (alcotest :with-test)
-  (unix :with-test)))
+  (alcotest :with-test)))
 
 (package
  (name ppx_ezlua)
@@ -33,5 +32,6 @@
   dune
   ppxlib
   ezlua
+  (base-unix :with-test)
   (ppx_deriving :with-test)
   (alcotest :with-test)))
