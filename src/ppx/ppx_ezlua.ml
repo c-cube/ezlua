@@ -414,7 +414,44 @@ let generate_impl ~loc:_ ~path:_ (_rec_flag, type_decls) =
         Location.raise_errorf ~loc "ppx_ezlua: open types not supported")
     type_decls
 
-let generate_intf ~loc:_ ~path:_ (_rec_flag, _type_decls) = []
+let generate_intf ~loc:_ ~path:_ (_rec_flag, type_decls) =
+  List.concat_map
+    (fun td ->
+      let loc = td.ptype_loc in
+      let type_name = td.ptype_name.txt in
+      let param_types =
+        List.filter_map
+          (fun (ct, _) ->
+            match ct.ptyp_desc with
+            | Ptyp_var _ -> Some ct
+            | _ -> None)
+          td.ptype_params
+      in
+      let applied =
+        ptyp_constr ~loc { loc; txt = Lident type_name } param_types
+      in
+      let ezlua name arg =
+        ptyp_constr ~loc { loc; txt = Ldot (Lident "Ezlua", name) } [ arg ]
+      in
+      let add_params base_type codec_name =
+        List.fold_right
+          (fun ct acc ->
+            ptyp_arrow ~loc Nolabel (ezlua codec_name ct) acc)
+          param_types
+          (ezlua codec_name base_type)
+      in
+      let mk name type_ =
+        psig_value ~loc
+          (value_description ~loc
+             ~name:{ loc; txt = name }
+             ~type_
+             ~prim:[])
+      in
+      [
+        mk ("to_lua_" ^ type_name) (add_params applied "to_lua");
+        mk ("of_lua_" ^ type_name) (add_params applied "of_lua");
+      ])
+    type_decls
 
 let ezlua_deriver =
   Deriving.add "ezlua"
