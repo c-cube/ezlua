@@ -4,6 +4,7 @@ type state = Lua_api_lib.state
 type 'a to_lua = state -> 'a -> unit
 type error = [ `Msg of string ]
 type 'a of_lua = state -> int -> ('a, error) result
+type 'a string_table = (string * 'a) list
 
 let pp_error ppf (`Msg s) = Format.pp_print_string ppf s
 
@@ -42,6 +43,14 @@ module Encode = struct
     Lua.rawseti state (-2) 1;
     enc_b state b;
     Lua.rawseti state (-2) 2
+
+  let string_table enc state kvs =
+    Lua.newtable state;
+    List.iter
+      (fun (k, v) ->
+        enc state v;
+        Lua.setfield state (-2) k)
+      kvs
 end
 
 module Decode = struct
@@ -144,6 +153,37 @@ module Decode = struct
         | Error (`Msg e) -> Error (`Msg ("pair.2: " ^ e))
         | Ok b -> Ok (a, b))
     )
+
+  let string_table dec state idx =
+    if not (Lua.istable state idx) then
+      Error
+        (`Msg
+           (Printf.sprintf "expected table, got %s" (LuaL.typename state idx)))
+    else (
+      let abs_idx = if idx < 0 then Lua.gettop state + idx + 1 else idx in
+      let result = ref [] in
+      let err = ref None in
+      Lua.pushnil state;
+      let continue_ = ref true in
+      while !continue_ do
+        if Lua.next state abs_idx = 0 then
+          continue_ := false
+        else (
+          (match Lua.tostring state (-2) with
+          | None -> ()
+          | Some k ->
+            (match dec state (-1) with
+            | Ok v -> result := (k, v) :: !result
+            | Error (`Msg e) ->
+              if !err = None then
+                err :=
+                  Some
+                    (Printf.sprintf "string_table key '%s': %s" k e)));
+          Lua.pop state 1)
+      done;
+      match !err with
+      | Some e -> Error (`Msg e)
+      | None -> Ok (List.rev !result))
 end
 
 (* Table helpers used by generated code *)

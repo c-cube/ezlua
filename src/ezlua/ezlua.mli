@@ -13,6 +13,9 @@ type error = [ `Msg of string ]
 type 'a of_lua = state -> int -> ('a, error) result
 (** Convert a lua value into an OCaml value, or fail *)
 
+type 'a string_table = (string * 'a) list
+(** A string-keyed dictionary. In OCaml this is a [(string * 'a) list]. *)
+
 val pp_error : Format.formatter -> error -> unit
 (** Pretty-print an [error]. *)
 
@@ -44,6 +47,10 @@ module Encode : sig
 
   val pair : 'a to_lua -> 'b to_lua -> ('a * 'b) to_lua
   (** Push a pair as a two-element Lua table [{a, b}]. *)
+
+  val string_table : 'a to_lua -> 'a string_table to_lua
+  (** Push a [(string * 'a) list] as a string-keyed Lua table
+      [\{ key1=v1, key2=v2, ... \}]. *)
 end
 
 (** Decode from lua.
@@ -78,6 +85,9 @@ module Decode : sig
 
   val pair : 'a of_lua -> 'b of_lua -> ('a * 'b) of_lua
   (** Decode a two-element Lua table as a pair. *)
+
+  val string_table : 'a of_lua -> 'a string_table of_lua
+  (** Decode a string-keyed Lua table as a [(string * 'a) list]. *)
 end
 
 val push_table : state -> unit
