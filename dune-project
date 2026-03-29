@@ -1,6 +1,6 @@
 (lang dune 3.0)
 
-(name lua-ppx)
+(name ezlua)
 
 (version 0.1)
 
@@ -21,7 +21,9 @@
  (depends
   (ocaml (>= 4.14))
   dune
-  ocaml-lua))
+  ocaml-lua
+  (alcotest :with-test)
+  (unix :with-test)))
 
 (package
  (name ppx_ezlua)
