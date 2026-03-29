@@ -53,3 +53,26 @@ let () =
 
 Argument decoding errors are reported back to Lua via `LuaL.error` with a
 message that includes the argument position and name.
+
+## Encoding conventions
+
+This table describes how OCaml values map to Lua values.
+
+| OCaml type | Lua representation |
+|---|---|
+| `int` | number (integer) |
+| `float` | number |
+| `string` | string |
+| `bool` | boolean |
+| `unit` | `nil` |
+| `'a list` / `'a array` | table `{v1, v2, ...}` (1-indexed) |
+| `'a option` | `nil` for `None`; `{v}` (single-element table) for `Some v` |
+| `'a * 'b` (pair) | table `{a, b}` via `Encode.pair`/`Decode.pair` |
+| N-tuple (`'a * 'b * 'c * ...`) | table `{v1, v2, ..., vN}` (1-indexed, inline) |
+| record | table keyed by field name, e.g. `{x=1.0, y=2.5}` |
+| variant (no payload) | `{tag="Ctor"}` |
+| variant (single payload) | `{tag="Ctor", value=v}` |
+| variant (tuple payload) | `{tag="Ctor", value={v1, v2, ...}}` |
+
+Pairs use the `Encode.pair`/`Decode.pair` library functions. Larger tuples
+generate inline table code directly.
