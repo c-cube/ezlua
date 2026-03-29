@@ -33,6 +33,8 @@ type score = {
 
 type opt_test = { maybe: string option } [@@deriving ezlua]
 
+type triple = int * string * bool [@@deriving ezlua]
+
 (* ------------------------------------------------------------------ *)
 
 let check_ok msg = function
@@ -150,6 +152,17 @@ let test_nested_option () =
       Alcotest.(check (option (option string))) label v v2)
     cases
 
+let test_triple_roundtrip () =
+  let state = Ezlua.create () in
+  let t = (42, "hello", true) in
+  Ezlua.set_global state "t" to_lua_triple t;
+  let (n, s, b) =
+    check_ok "triple roundtrip" (Ezlua.get_global state "t" of_lua_triple)
+  in
+  Alcotest.(check int) "int" 42 n;
+  Alcotest.(check string) "string" "hello" s;
+  Alcotest.(check bool) "bool" true b
+
 let%lua add (x : int) (y : int) : int = x + y
 let%lua greet (name : string) : string = "Hello, " ^ name
 
@@ -249,6 +262,7 @@ let () =
           test_case "roundtrip" `Quick test_opt_roundtrip;
           test_case "nested" `Quick test_nested_option;
         ] );
+      "tuple", [ test_case "roundtrip" `Quick test_triple_roundtrip ];
       "let_lua", [ test_case "callback" `Quick test_let_lua ];
       "ezlua_smoke", [ test_case "smoke" `Quick test_ezlua_smoke ];
       "ezlua_foo", [ test_case "foo" `Quick test_foo ];
