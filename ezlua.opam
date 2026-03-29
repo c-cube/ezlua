@@ -5,8 +5,8 @@ synopsis: "OCaml-Lua codec runtime and high-level interpreter API"
 maintainer: ["Simon Cruanes"]
 authors: ["Simon Cruanes"]
 license: "MIT"
-homepage: "https://github.com/c-cube/lua-ppx"
-bug-reports: "https://github.com/c-cube/lua-ppx/issues"
+homepage: "https://github.com/c-cube/ezlua"
+bug-reports: "https://github.com/c-cube/ezlua/issues"
 depends: [
   "ocaml" {>= "4.14"}
   "dune" {>= "3.0"}
@@ -28,4 +28,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/c-cube/lua-ppx.git"
+dev-repo: "git+https://github.com/c-cube/ezlua.git"

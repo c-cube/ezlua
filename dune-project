@@ -7,7 +7,7 @@
 (generate_opam_files true)
 
 (source
- (github c-cube/lua-ppx))
+ (github c-cube/ezlua))
 
 (authors "Simon Cruanes")
 (maintainers "Simon Cruanes")
