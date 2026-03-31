@@ -35,7 +35,7 @@ module Encode : sig
   val bool : bool to_lua
   (** Push a boolean onto the Lua stack. *)
 
-  val unit_ : unit to_lua
+  val unit : unit to_lua
   (** Push [nil] onto the Lua stack. *)
 
   val option : 'a to_lua -> 'a option to_lua
@@ -72,7 +72,7 @@ module Decode : sig
   val bool : bool of_lua
   (** Read a boolean from stack position [idx]. *)
 
-  val unit_ : unit of_lua
+  val unit : unit of_lua
   (** Always succeeds, ignoring the value at [idx]. *)
 
   val option : 'a of_lua -> 'a option of_lua

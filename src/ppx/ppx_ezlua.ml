@@ -13,7 +13,7 @@ let rec encode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "string"; _ }, []) ->
     [%expr Ezlua.Encode.string]
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr Ezlua.Encode.bool]
-  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Encode.unit_]
+  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Encode.unit]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ arg ]) ->
     let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.list [%e inner]]
@@ -74,7 +74,7 @@ let rec decode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "string"; _ }, []) ->
     [%expr Ezlua.Decode.string]
   | Ptyp_constr ({ txt = Lident "bool"; _ }, []) -> [%expr Ezlua.Decode.bool]
-  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Decode.unit_]
+  | Ptyp_constr ({ txt = Lident "unit"; _ }, []) -> [%expr Ezlua.Decode.unit]
   | Ptyp_constr ({ txt = Lident "list"; _ }, [ arg ]) ->
     let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.list [%e inner]]

@@ -18,7 +18,7 @@ module Encode = struct
   let float state v = Lua.pushnumber state v
   let string state v = Lua.pushstring state v
   let bool state v = Lua.pushboolean state v
-  let unit_ state () = Lua.pushnil state
+  let unit state () = Lua.pushnil state
 
   let option enc state v =
     match v with
@@ -87,7 +87,7 @@ module Decode = struct
         (`Msg
            (Printf.sprintf "expected boolean, got %s" (LuaL.typename state idx)))
 
-  let unit_ _state _idx = Ok ()
+  let unit _state _idx = Ok ()
 
   let option dec state idx =
     if Lua.isnoneornil state idx then
