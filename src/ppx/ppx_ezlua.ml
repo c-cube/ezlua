@@ -312,7 +312,7 @@ let derive_variant ~loc ~type_name ~params
                 [%e estring ~loc cname];
               Lua_api.Lua.newtable state;
               [%e push_tuple];
-              Lua_api.Lua.setfield state (-2) "value"]
+              Lua_api.Lua.setfield state (-2) "values"]
           in
           case ~lhs:pat ~guard:None ~rhs:body
         | Pcstr_record _ ->
@@ -381,7 +381,7 @@ let derive_variant ~loc ~type_name ~params
           in
           let body =
             [%expr
-              Lua_api.Lua.getfield state idx "value";
+              Lua_api.Lua.getfield state idx "values";
               let arr_idx__ = Lua_api.Lua.gettop state in
               let result__ = [%e get_elems] in
               Lua_api.Lua.pop state 1;

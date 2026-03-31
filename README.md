@@ -14,7 +14,7 @@ Annotate a type declaration to generate `<name>_to_lua` and `<name>_of_lua`
 functions automatically.
 
 Records become Lua tables keyed by field name. Variants become tables with a
-`"tag"` field (and an optional `"value"` field for payloads).
+`"tag"` field (and an optional `"value"` or `"values"` field for payloads).
 
 ```ocaml
 type point = {
