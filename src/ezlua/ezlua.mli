@@ -16,6 +16,8 @@ type 'a of_lua = state -> int -> ('a, error) result
 type 'a string_table = (string * 'a) list
 (** A string-keyed dictionary. In OCaml this is a [(string * 'a) list]. *)
 
+val string_of_error : error -> string
+
 val pp_error : Format.formatter -> error -> unit
 (** Pretty-print an [error]. *)
 
@@ -50,13 +52,13 @@ module Encode : sig
 
   val string_table : 'a to_lua -> 'a string_table to_lua
   (** Push a [(string * 'a) list] as a string-keyed Lua table
-      [\{ key1=v1, key2=v2, ... \}]. *)
+      [{ key1=v1, key2=v2, ... }]. *)
 end
 
 (** Decode from lua.
 
-    Decoding always take the index of the value to decode in the lua stack. The
-    top of the stack is at [(-1)]. *)
+    Decoding always take the index [idx] of the value to decode in the lua
+    stack. The top of the stack is at [(-1)]. *)
 module Decode : sig
   val int : int of_lua
   (** Read an integer from stack position [idx]. *)

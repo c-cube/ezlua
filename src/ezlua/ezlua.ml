@@ -6,7 +6,8 @@ type error = [ `Msg of string ]
 type 'a of_lua = state -> int -> ('a, error) result
 type 'a string_table = (string * 'a) list
 
-let pp_error ppf (`Msg s) = Format.pp_print_string ppf s
+let string_of_error (`Msg s) = s
+let pp_error out (`Msg s) = Format.pp_print_string out s
 
 let[@inline] unwrap_err = function
   | Ok x -> x
