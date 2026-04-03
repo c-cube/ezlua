@@ -23,7 +23,7 @@ let rec encode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
     let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.option [%e inner]]
-  | Ptyp_constr ({ txt = Lident "string_table"; _ }, [ arg ]) ->
+  | Ptyp_constr ({ txt = Ldot (Lident "Ezlua", "string_table"); _ }, [ arg ]) ->
     let inner = encode_expr_of_type arg in
     [%expr Ezlua.Encode.string_table [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->
@@ -84,7 +84,7 @@ let rec decode_expr_of_type (ct : core_type) : expression =
   | Ptyp_constr ({ txt = Lident "option"; _ }, [ arg ]) ->
     let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.option [%e inner]]
-  | Ptyp_constr ({ txt = Lident "string_table"; _ }, [ arg ]) ->
+  | Ptyp_constr ({ txt = Ldot (Lident "Ezlua", "string_table"); _ }, [ arg ]) ->
     let inner = decode_expr_of_type arg in
     [%expr Ezlua.Decode.string_table [%e inner]]
   | Ptyp_constr ({ txt = Lident name; _ }, args) ->

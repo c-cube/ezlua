@@ -33,6 +33,7 @@ type score = {
 
 type opt_test = { maybe: string option } [@@deriving ezlua]
 type triple = int * string * bool [@@deriving ezlua]
+type string_table_test = { data: int Ezlua.string_table } [@@deriving ezlua]
 
 (* ------------------------------------------------------------------ *)
 
@@ -220,6 +221,19 @@ let test_foo () =
     { x = 5; y = 41; swap = true }
     x
 
+let test_string_table () =
+  let state = Ezlua.create () in
+  let t = { data = [ "x", 10; "y", 20; "z", 30 ] } in
+  Ezlua.set_global state "t" string_table_test_to_lua t;
+  let t2 =
+    check_ok "string_table roundtrip"
+      (Ezlua.get_global state "t" string_table_test_of_lua)
+  in
+  (* Sort both lists since Lua table iteration doesn't preserve insertion order *)
+  let sort_data d = List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) d in
+  Alcotest.(check (list (pair string int)))
+    "data" (sort_data t.data) (sort_data t2.data)
+
 let test_stress () =
   let t_start = Unix.gettimeofday () in
   let minor_start = Gc.minor_words () in
@@ -265,5 +279,6 @@ let () =
       "let_lua", [ test_case "callback" `Quick test_let_lua ];
       "ezlua_smoke", [ test_case "smoke" `Quick test_ezlua_smoke ];
       "ezlua_foo", [ test_case "foo" `Quick test_foo ];
+      "string_table", [ test_case "roundtrip" `Quick test_string_table ];
       "stress", [ test_case "stress" `Quick test_stress ];
     ]
