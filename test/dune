@@ -1,5 +1,5 @@
-(test
- (name test_deriving)
+(tests
+ (names test_deriving test_fib)
  (package ppx_ezlua)
  (libraries ezlua alcotest unix)
  (preprocess
