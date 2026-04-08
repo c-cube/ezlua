@@ -30,7 +30,7 @@
  (depends
   (ocaml (>= 4.14))
   dune
-  ppxlib
+  (ppxlib (>= 0.36))
   ezlua
   (base-unix :with-test)
   (ppx_deriving :with-test)
