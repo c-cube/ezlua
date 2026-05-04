@@ -610,10 +610,11 @@ let expand_lua_let ~loc ~path:_ pat expr =
         [%expr
           match [%e dec] lua_state [%e eint ~loc:ploc i] with
           | Error (`Msg msg) ->
-            Lua_api.LuaL.error lua_state "%s"
+            Ezlua.signal_error lua_state
               [%e
                 estring ~loc:ploc (Printf.sprintf "bad arg %d (%s): " i pname)
-                |> fun prefix -> [%expr [%e prefix] ^ msg]]
+                |> fun prefix -> [%expr [%e prefix] ^ msg]];
+            0
           | Ok [%p ppat_var ~loc:ploc { loc = ploc; txt = pname }] -> [%e inner]])
       (List.mapi (fun i x -> i + 1, x) params)
       result_bind

@@ -110,16 +110,17 @@ val get_stack : state -> int -> 'a of_lua -> ('a, error) result
 
 val create : ?stdlib:bool -> unit -> state
 (** Create a new Lua state. [stdlib] defaults to [true]; pass [~stdlib:false] to
-    skip loading the standard libraries. *)
+    skip loading the standard libraries. The error-propagation infrastructure
+    ([signal_error] / [_ez_check]) is installed automatically. *)
 
 val unwrap_err : ('a, error) result -> 'a
 (** Return the [Ok] value, or [failwith] the error message. *)
 
 val add_function : state -> string -> Lua_api_lib.oCamlFunction -> unit
-(** Register an OCaml function as a Lua global.
-
-    A function is of type [state -> int]. Use [let%lua] with the ppx to easily
-    export OCaml functions to lua. *)
+(** Register an OCaml function as a Lua global, wrapped with an automatic
+    [_ez_check()] call so that errors signalled via [signal_error] propagate
+    correctly to the Lua caller. Use [let%lua] with the ppx to generate the
+    [oCamlFunction] wrapper. *)
 
 val set_global : state -> string -> 'a to_lua -> 'a -> unit
 (** Push a value with [to_lua] and assign it to a Lua global variable. *)
@@ -132,3 +133,9 @@ val run : state -> string -> (unit, error) result
 
 val run_file : state -> string -> (unit, error) result
 (** Compile and execute a Lua source file at the given path. *)
+
+val signal_error : state -> string -> unit
+(** Store an error message to be re-raised by Lua after the current OCaml
+    callback returns. Safe alternative to [lua_error] from OCaml: avoids the C
+    longjmp that would corrupt OCaml 5's fiber runtime. Automatically used by
+    [let%lua]-generated wrappers. *)

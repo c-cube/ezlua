@@ -47,12 +47,51 @@ let%lua add (x : int) (y : int) : int = x + y
 
 let () =
   let state = Ezlua.create () in
+  Ezlua.init_error_callbacks state;   (* call once *)
   Ezlua.add_function state "add" add_lua;
   ignore (Ezlua.run state "assert(add(1, 2) == 3)")
 ```
 
-Argument decoding errors are reported back to Lua via `LuaL.error` with a
-message that includes the argument position and name.
+`add_function` automatically wraps the callback with `_ez_check()` so argument
+decode errors propagate to the Lua caller transparently. See
+[OCaml 5 safety](#ocaml-5-safety) for the full picture.
+
+## OCaml 5 safety
+
+OCaml 5 uses a fiber-based runtime. Calling `lua_error` (which does a C
+`longjmp`) from inside an OCaml callback skips OCaml activation records on the
+stack, corrupting the GC and crashing the program.
+
+**The safe pattern**: never call `lua_error` / `LuaL.error` from OCaml code.
+Instead:
+
+1. Call `Ezlua.init_error_callbacks state` once after creating the state.
+   This installs two globals: `_ez_pending_error` (initially `nil`) and
+   `_ez_check()`.
+
+2. When an OCaml callback needs to signal an error, call
+   `Ezlua.signal_error state msg` and return `0` immediately.
+   This stores the message in `_ez_pending_error` without any longjmp.
+
+3. Wrap each OCaml-backed Lua function in a thin Lua shim that calls
+   `_ez_check()` after the OCaml callback returns:
+
+   ```lua
+   mylib = {
+     foo = function(...)
+       local r = _raw_foo(...)  -- calls OCaml via caml_callback
+       _ez_check()              -- re-raises from pure Lua (safe)
+       return r
+     end,
+   }
+   ```
+
+   `_ez_check()` is pure Lua; it calls Lua's own `error()` which performs the
+   longjmp with no OCaml frames on the stack.
+
+The `let%lua` ppx follows this convention: generated `<name>_lua` wrappers call
+`signal_error` (not `LuaL.error`) so they are safe to use inside the pattern
+above. You still need to provide the Lua-side shim that calls `_ez_check()`.
 
 ## Encoding conventions
 

@@ -224,13 +224,6 @@ let get_stack state idx of_lua_fn =
 
 (* High-level API *)
 
-let create ?(stdlib = true) () =
-  let state = LuaL.newstate () in
-  if stdlib then LuaL.openlibs state;
-  state
-
-let add_function state name f = Lua.register state name f
-
 let set_global state name to_lua_fn v =
   to_lua_fn state v;
   Lua.setglobal state name
@@ -261,3 +254,58 @@ let run_file state path =
     Ok ()
   else
     pop_error state
+
+let init_error_callbacks (state : state) : unit =
+  match
+    run state
+      {|
+_ez_pending_error = nil
+function _ez_check()
+  if _ez_pending_error ~= nil then
+    local e = _ez_pending_error
+    _ez_pending_error = nil
+    error(e, 3)
+  end
+end
+|}
+  with
+  | Ok () -> ()
+  | Error (`Msg e) -> failwith ("ezlua.init_error_callbacks: " ^ e)
+
+let create ?(stdlib = true) () =
+  let state = LuaL.newstate () in
+  if stdlib then LuaL.openlibs state;
+  init_error_callbacks state;
+  state
+
+let signal_error (state : state) (msg : string) : unit =
+  Lua.pushstring state msg;
+  Lua.setglobal state "_ez_pending_error"
+
+(* Long-term: replace with a C trampoline (caml_callback_exn + lua_error from C).
+   Short-term: auto-wrap with _ez_check in Lua so signal_error propagates
+   transparently. _ez_check is installed by create(). *)
+let add_function state name f =
+  let raw = "__ez_raw__" ^ name in
+  let safe st =
+    match f st with
+    | n -> n
+    | exception exn ->
+      signal_error st (Printexc.to_string exn);
+      0
+  in
+  Lua.register state raw safe;
+  match
+    run state
+      (Printf.sprintf
+         {|local _r = %s
+           %s = nil
+           %s = function(...)
+             local r = _r(...)
+             _ez_check()
+             return r
+           end|}
+         raw raw name)
+  with
+  | Ok () -> ()
+  | Error (`Msg e) -> failwith ("Ezlua.add_function: " ^ e)
